@@ -11,14 +11,6 @@ import { EmptyPrograms } from './EmptyPrograms';
 import { ProgramList } from './ProgramList';
 import { getOptions } from './getOptions';
 import { OptionLabel } from '../../OptionLabel';
-import { useDataQuery } from '@dhis2/app-runtime';
-
-
-const dataStoreQuery = {
-    results: {
-        resource: "dataStore/ovc_capture_app/programs"
-    },
-}
 
 const styles = () => ({
     selectBarMenu: {
@@ -38,19 +30,6 @@ type OwnProps = {
     selectedOrgUnitId?: string;
     selectedCategories: Record<string, any>;
     formIsOpen: boolean;
-};
-
-
-type MasterProgram = {
-    id: string;
-    name: string;
-    description?: string;
-};
-
-type Params = {
-    results?: {
-        masterPrograms?: MasterProgram[];
-    };
 };
 
 type Props = OwnProps & WithStyles<typeof styles>;
@@ -73,29 +52,8 @@ const ProgramSelectorPlain = ({
     const programOptions = getOptions(programsArray, selectedOrgUnitId);
     const isMenuDisabled = !handleClickProgram;
 
-    const programsDataStoreQuery = useDataQuery(dataStoreQuery, {
-        lazy: true,
-        onComplete: function (params) {
-            // console.log({ params })
-            const masterPrograms = (params as Params)?.results?.masterPrograms;
-            const masterProgramsCollection = new Map(masterPrograms?.map(item => [item.id, item]));
-            // console.log(masterProgramsCollection)
-            const programs = Array.from(programCollection.values())
-            const displayedProgramas = programs.filter(item =>
-                masterProgramsCollection.has(item._id)
-            );
-            // console.log(displayedProgramas)
-            setProgramsArray(displayedProgramas);
-        }
-    })
-
     useEffect(() => {
-        // setProgramsArray(Array.from(programCollection.values()));
-
-        if (!selectedProgramId) {
-            programsDataStoreQuery.refetch()
-        }
-
+        setProgramsArray(Array.from(programCollection.values()));
     }, []);
 
     const renderCategories = () => {
@@ -119,7 +77,7 @@ const ProgramSelectorPlain = ({
         return null;
     };
 
-
+    console.log({ programsArray })
 
     return (
         <>
