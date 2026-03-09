@@ -1,15 +1,16 @@
 /* eslint-disable complexity */
 import isNumber from 'lodash/isNumber';
 import isObject from 'lodash/isObject';
+import isString from 'lodash/isString';
 import log from 'loglevel';
 import { errorCreator } from 'capture-core-utils';
 import { useEffect } from 'react';
 import { useApiMetadataQuery } from '../../../../../../../utils/reactQueryHelpers';
-import type { DataStoreWorkingLists, UseMainViewConfig } from './useMainViewConfig.types';
+import type { DataStoreDataEntry, DataStoreWorkingLists, UseMainViewConfig } from './useMainViewConfig.types';
 
 export const useMainViewConfig: UseMainViewConfig = () => {
     const {
-        data: configExists,
+        data: captureKeys,
         isLoading: namespaceIsLoading,
         isError: namespaceIsError,
         error: namespaceError,
@@ -17,14 +18,14 @@ export const useMainViewConfig: UseMainViewConfig = () => {
         ['dataStore', 'capture'], {
             resource: 'dataStore/capture',
         }, {
-            select: (captureKeys: Array<string> | null | undefined) => captureKeys?.includes('workingLists'),
+            select: (namespaceKeys: Array<string> | null | undefined) => namespaceKeys ?? [],
         });
 
     const { data: mainViewConfig, isInitialLoading, isError, error } = useApiMetadataQuery<any>(
         ['dataStore', 'workingListsEvents'], {
             resource: 'dataStore/capture/workingLists',
         }, {
-            enabled: !!configExists,
+            enabled: captureKeys?.includes('workingLists'),
             select: (workingLists: DataStoreWorkingLists) => {
                 // only adding support for relative event date as of now
                 // we should use Zod here long-term to properly validate the structure of the object
@@ -77,6 +78,26 @@ export const useMainViewConfig: UseMainViewConfig = () => {
         },
     );
 
+    const {
+        data: dataEntryPrograms,
+        isInitialLoading: dataEntryIsInitialLoading,
+        isError: dataEntryIsError,
+        error: dataEntryError,
+    } = useApiMetadataQuery<any>(
+        ['dataStore', 'ovc_capture_app'], {
+            resource: 'dataStore/ovc_capture_app/data_entry',
+        }, {
+            enabled: captureKeys?.includes('data_entry'),
+            select: (dataEntryConfig: DataStoreDataEntry) =>
+                (dataEntryConfig?.programs ?? [])
+                    .filter(({ program, programStage }) => isString(program) && isString(programStage))
+                    .map(({ program, programStage }) => ({
+                        program: program as string,
+                        programStage: programStage as string,
+                    })),
+        },
+    );
+
     useEffect(() => {
         if (namespaceIsError) {
             log.error(
@@ -90,10 +111,17 @@ export const useMainViewConfig: UseMainViewConfig = () => {
                     'workingLists key could not be fetched from the datastore')({ error }),
             );
         }
-    }, [isError, error, namespaceIsError, namespaceError]);
+        if (dataEntryIsError) {
+            log.error(
+                errorCreator(
+                    'data_entry key could not be fetched from the datastore')({ error: dataEntryError }),
+            );
+        }
+    }, [isError, error, namespaceIsError, namespaceError, dataEntryIsError, dataEntryError]);
 
     return {
         mainViewConfig,
-        mainViewConfigReady: !namespaceIsLoading && !isInitialLoading,
+        dataEntryPrograms,
+        mainViewConfigReady: !namespaceIsLoading && !isInitialLoading && !dataEntryIsInitialLoading,
     };
 };

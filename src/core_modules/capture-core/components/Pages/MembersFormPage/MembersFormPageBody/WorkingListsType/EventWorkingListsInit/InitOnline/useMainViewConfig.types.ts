@@ -2,6 +2,7 @@ import type { MainViewConfig } from '../../../../../../WorkingLists/EventWorking
 
 export type UseMainViewConfig = () => {
     mainViewConfig?: MainViewConfig;
+    dataEntryPrograms?: Array<{ program: string; programStage: string }>;
     mainViewConfigReady: boolean;
 };
 
@@ -24,4 +25,11 @@ export type DataStoreWorkingLists = {
     global: {
         event: DatastoreWorkingListsEvents;
     };
+};
+
+export type DataStoreDataEntry = {
+    programs?: Array<{
+        program?: string;
+        programStage?: string;
+    }>;
 };

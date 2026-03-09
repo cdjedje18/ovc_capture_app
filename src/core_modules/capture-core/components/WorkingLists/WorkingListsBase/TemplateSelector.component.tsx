@@ -20,14 +20,22 @@ const getStyles = (theme: any) => ({
         padding: `${theme.typography.pxToRem(12)} ${theme.typography.pxToRem(12)} ${theme.typography.pxToRem(4)}`,
     },
     controlsContainer: {
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'flex-end',
+        display: 'grid',
+        gridTemplateColumns: 'repeat(12, minmax(0, 1fr))',
+        alignItems: 'end',
+        columnGap: theme.typography.pxToRem(8),
         width: '100%',
     },
     dateFieldContainer: {
         padding: `${theme.typography.pxToRem(8)} ${theme.typography.pxToRem(8)} ${theme.typography.pxToRem(6)}`,
-        maxWidth: theme.typography.pxToRem(280),
+        gridColumn: 'span 2',
+        width: '100%',
+        maxWidth: 'none',
+        minWidth: 0,
+    },
+    tabsContainer: {
+        gridColumn: 'span 10',
+        minWidth: 0,
     },
     titleContainer: {
         padding: `${theme.typography.pxToRem(12)} ${theme.typography.pxToRem(12)} ${theme.typography.pxToRem(10)}`,
@@ -100,7 +108,9 @@ const TemplateSelectorPlain = (props: Props) => {
                             onDateSelect={onDateSelect}
                         />
                     </div>
-                    <TableHeaderTabsSelector />
+                    <div className={classes.tabsContainer}>
+                        <TableHeaderTabsSelector />
+                    </div>
                 </div>
             ) : null}
         </div>
