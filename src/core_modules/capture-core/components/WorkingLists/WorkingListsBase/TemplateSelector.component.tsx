@@ -96,6 +96,25 @@ const TemplateSelectorPlain = ({
     const calendarType: any = systemSettings.calendar || 'gregory';
     const format: any = systemSettings.dateFormat;
     const locale = systemSettings.uiLocale;
+    const visitDateLabel = React.useMemo(() => {
+        if (!isMembersFormPage) {
+            return 'Data da visita:';
+        }
+
+        const currentDataEntryProgram =
+            dataEntryPrograms?.find(entry => entry.program === programId) ?? dataEntryPrograms?.[0];
+        const currentProgram = programCollection.get(currentDataEntryProgram?.program || '');
+        const currentProgramStageId = currentDataEntryProgram?.programStage;
+        const currentProgramStage = currentProgramStageId && currentProgram?.getStage(currentProgramStageId);
+        const stageAny = currentProgramStage as any;
+
+        const labelFromStage =
+            stageAny?.executionDateLabel ||
+            stageAny?.displayExecutionDateLabel ||
+            currentProgramStage?.stageForm?.getLabel('occurredAt');
+
+        return labelFromStage ? `${labelFromStage}:` : 'Data da visita:';
+    }, [dataEntryPrograms, isMembersFormPage, programId]);
 
     const onDateSelect = React.useCallback(
         (value: { calendarDateString: string } | null) => {
@@ -119,7 +138,7 @@ const TemplateSelectorPlain = ({
                         className={classes.dateFieldContainer}
                     >
                         <CalendarInput
-                            label="Data da visita:"
+                            label={visitDateLabel}
                             date={selectedDate}
                             calendar={calendarType}
                             format={format}
