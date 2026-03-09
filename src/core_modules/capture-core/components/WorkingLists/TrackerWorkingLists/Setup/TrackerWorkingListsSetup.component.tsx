@@ -243,6 +243,7 @@ export const TrackerWorkingListsSetup = ({
         programStageFiltersOnly,
         onUpdateList,
     );
+    const onRowClickNoop = useCallback(() => {}, []);
 
     return (
         <WorkingListsBase
@@ -269,6 +270,7 @@ export const TrackerWorkingListsSetup = ({
             sortById={sortById}
             sortByDirection={sortByDirection}
             bulkActionBarComponent={bulkActionBarComponent}
+            onClickListRow={isMembersFormPage ? onRowClickNoop : passOnProps.onClickListRow}
         />
     );
 };

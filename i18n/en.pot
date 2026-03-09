@@ -5,8 +5,8 @@ msgstr ""
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1)\n"
-"POT-Creation-Date: 2026-03-09T14:40:03.662Z\n"
-"PO-Revision-Date: 2026-03-09T14:40:03.662Z\n"
+"POT-Creation-Date: 2026-03-09T16:50:13.688Z\n"
+"PO-Revision-Date: 2026-03-09T16:50:13.689Z\n"
 
 msgid "The application could not be loaded."
 msgstr "The application could not be loaded."
@@ -2037,9 +2037,6 @@ msgstr "Delete view"
 
 msgid "Share view..."
 msgstr "Share view..."
-
-msgid "Section {{number}}"
-msgstr "Section {{number}}"
 
 msgid "Do you really want to delete the '{{templateName}}' view?"
 msgstr "Do you really want to delete the '{{templateName}}' view?"
