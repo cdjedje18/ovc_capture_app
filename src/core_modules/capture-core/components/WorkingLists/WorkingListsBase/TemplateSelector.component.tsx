@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { CalendarInput } from '@dhis2/ui';
+import { CalendarInput, IconCalendar16, colors } from '@dhis2/ui';
 import i18n from '@dhis2/d2-i18n';
 import { withStyles } from 'capture-core-utils/styles';
 import type { WithStyles } from 'capture-core-utils/styles';
@@ -31,6 +31,13 @@ const getStyles = (theme: any) => ({
         gridColumn: 'span 2',
         width: '100%',
         minWidth: 0,
+    },
+    dateFieldLabel: {
+        ...theme.typography.body1,
+        marginBottom: theme.typography.pxToRem(6),
+        display: 'flex',
+        alignItems: 'center',
+        gap: theme.typography.pxToRem(4),
     },
     tabsContainer: {
         gridColumn: 'span 10',
@@ -137,8 +144,12 @@ const TemplateSelectorPlain = ({
                         data-test="workinglists-template-selector-date-container"
                         className={classes.dateFieldContainer}
                     >
+                        <div className={classes.dateFieldLabel}>
+                            <IconCalendar16 color={colors.grey700} />
+                            {visitDateLabel}
+                        </div>
                         <CalendarInput
-                            label={visitDateLabel}
+                            label=""
                             date={selectedDate}
                             calendar={calendarType}
                             format={format}
