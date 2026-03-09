@@ -3,6 +3,7 @@ import i18n from '@dhis2/d2-i18n';
 import { ADDITIONAL_FILTERS, ADDITIONAL_FILTERS_LABELS } from '../../helpers';
 import { dataElementTypes, type TrackerProgram } from '../../../../../metaData';
 import type { MainColumnConfig, MetadataColumnConfig, TrackerWorkingListsColumnConfigs } from '../../types';
+import { isMembersFormPage as isMembersFormPageRoute } from '../../../utils/isMembersFormPage';
 
 const getMainConfig = (hasDisplayInReportsAttributes: boolean): Array<MainColumnConfig> =>
     [
@@ -86,10 +87,33 @@ const getProgramStageMainConfig = (
         additionalColumn: true,
     }));
 
-const getEventsMetaDataConfig = (programStage): Array<MetadataColumnConfig> => {
+const getEventsMetaDataConfig = (
+    programStage,
+    selectedSectionId?: string,
+    forceVisible?: boolean,
+): Array<MetadataColumnConfig> => {
     const stageForm = programStage.stageForm;
-    const dataElements = stageForm ? [...stageForm?.getElements()] : [];
-    return getDataValuesMetaDataConfig(dataElements);
+    if (!stageForm) {
+        return [];
+    }
+
+    if (!selectedSectionId) {
+        return getDataValuesMetaDataConfig([...stageForm.getElements()], forceVisible);
+    }
+
+    const selectedSection = stageForm.getSection(selectedSectionId);
+    if (!selectedSection) {
+        return [];
+    }
+
+    const dataElementsInSection = Array.from(selectedSection.elements.values()).reduce((acc, element: any) => {
+        if (element?.fields && typeof element.fields.values === 'function') {
+            return acc.concat(Array.from(element.fields.values()));
+        }
+        return acc.concat(element);
+    }, []);
+
+    return getDataValuesMetaDataConfig(dataElementsInSection, forceVisible);
 };
 
 const getTEIMetaDataConfig = (attributes: Array<any>, orgUnitId: string | null | undefined): Array<MetadataColumnConfig> =>
@@ -116,10 +140,10 @@ const getTEIMetaDataConfig = (attributes: Array<any>, orgUnitId: string | null |
         minCharactersToSearch,
     }));
 
-const getDataValuesMetaDataConfig = (dataElements): Array<MetadataColumnConfig> =>
+const getDataValuesMetaDataConfig = (dataElements, forceVisible?: boolean): Array<MetadataColumnConfig> =>
     dataElements.map(({ id, displayInReports, type, name, formName, optionSet }) => ({
         id,
-        visible: displayInReports,
+        visible: forceVisible ? true : displayInReports,
         type,
         header: formName || name,
         options: optionSet && optionSet.options.map(({ text, value }) => ({ text, value })),
@@ -131,12 +155,12 @@ export const useDefaultColumnConfig = (
     program: TrackerProgram,
     orgUnitId: string | null | undefined,
     programStageId: string | null | undefined,
+    selectedSectionId?: string,
 ): TrackerWorkingListsColumnConfigs =>
     useMemo(() => {
         const { attributes, stages } = program;
         const programStage = programStageId && stages.get(programStageId);
-        const isMembersFormPage =
-            typeof window !== 'undefined' && window.location.pathname.includes('/membersForm');
+        const isMembersFormPage = isMembersFormPageRoute();
         const hasDisplayInReportsAttributes = attributes.some(attribute => attribute.displayInReports);
 
         const defaultColumns = [
@@ -145,10 +169,15 @@ export const useDefaultColumnConfig = (
         ];
 
         if (programStageId && programStage) {
+            const shouldForceVisibleDataElements = isMembersFormPage && !!selectedSectionId;
             return defaultColumns.concat([
                 ...getProgramStageMainConfig(programStage, isMembersFormPage),
-                ...getEventsMetaDataConfig(programStage),
+                ...getEventsMetaDataConfig(
+                    programStage,
+                    isMembersFormPage ? selectedSectionId : undefined,
+                    shouldForceVisibleDataElements,
+                ),
             ]);
         }
         return defaultColumns;
-    }, [orgUnitId, program, programStageId]);
+    }, [orgUnitId, program, programStageId, selectedSectionId]);

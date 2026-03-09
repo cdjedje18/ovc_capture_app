@@ -26,6 +26,7 @@ export type RawQueryArgs = {
     page: number,
     pageSize: number,
     programId: string,
+    programStageId?: string,
     orgUnitId: string,
     filters?: RawFilterQueryArgs,
     sortById: string,

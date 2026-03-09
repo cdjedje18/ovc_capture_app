@@ -4,6 +4,7 @@ import { withStyles } from 'capture-core-utils/styles';
 import type { WithStyles } from 'capture-core-utils/styles';
 import { useMainViewConfig } from 'capture-core/components/Pages/MembersFormPage/MembersFormPageBody/WorkingListsType/EventWorkingListsInit/InitOnline/useMainViewConfig';
 import { programCollection } from 'capture-core/metaDataMemoryStores';
+import { setSelectedMembersSection, useSelectedMembersSection } from './membersSectionSelection.store';
 
 const getStyles = (theme: any) => ({
     container: {
@@ -14,14 +15,22 @@ const getStyles = (theme: any) => ({
 }) as const;
 
 type Props = WithStyles<typeof getStyles>;
+type OwnProps = {
+    programId: string;
+};
 
-const TableHeaderTabsSelectorPlain = ({ classes }: Props) => {
+const TableHeaderTabsSelectorPlain = ({ classes, programId }: Props & OwnProps) => {
     const { dataEntryPrograms } = useMainViewConfig();
 
-    const currentProgram = programCollection.get(dataEntryPrograms?.[0]?.program || '');
-    const currentProgramStage = dataEntryPrograms?.[0]?.programStage || '';
+    const currentDataEntryProgram = React.useMemo(
+        () => dataEntryPrograms?.find(entry => entry.program === programId) ?? dataEntryPrograms?.[0],
+        [dataEntryPrograms, programId],
+    );
+    const currentProgram = programCollection.get(currentDataEntryProgram?.program || '');
+    const currentProgramStage = currentDataEntryProgram?.programStage || '';
+    const selectedSectionId = useSelectedMembersSection(currentProgramStage);
 
-    const sectionLabelsFromProgramStage = React.useMemo(() => {
+    const sectionsFromProgramStage = React.useMemo(() => {
         const programStage = currentProgram?.getStage(currentProgramStage);
         if (!programStage) {
             return [];
@@ -29,34 +38,45 @@ const TableHeaderTabsSelectorPlain = ({ classes }: Props) => {
 
         return Array.from(programStage.stageForm.sections.values())
             .filter(section => section.visible && section.name)
-            .map(section => section.name);
+            .map(section => ({
+                id: section.id,
+                name: section.name,
+            }));
     }, [currentProgram, currentProgramStage]);
 
-    const sectionLabels = React.useMemo(
-        () =>
-            sectionLabelsFromProgramStage.length > 0
-                ? sectionLabelsFromProgramStage
-                : [],
-        [sectionLabelsFromProgramStage],
-    );
-    const [activeTab, setActiveTab] = React.useState<string | undefined>(sectionLabels[0]);
+    const [activeTab, setActiveTab] = React.useState<string | undefined>(sectionsFromProgramStage[0]?.id);
 
     React.useEffect(() => {
-        if (!activeTab || !sectionLabels.includes(activeTab)) {
-            setActiveTab(sectionLabels[0]);
+        const selectedSectionStillVisible =
+            selectedSectionId && sectionsFromProgramStage.some(section => section.id === selectedSectionId);
+        const nextSectionId = selectedSectionStillVisible ? selectedSectionId : sectionsFromProgramStage[0]?.id;
+
+        if (nextSectionId !== activeTab) {
+            setActiveTab(nextSectionId);
         }
-    }, [sectionLabels, activeTab]);
+        setSelectedMembersSection(currentProgramStage, nextSectionId);
+    }, [sectionsFromProgramStage, activeTab, selectedSectionId, currentProgramStage]);
+
+    const handleTabClick = React.useCallback((sectionId: string) => {
+        setActiveTab(sectionId);
+        setSelectedMembersSection(currentProgramStage, sectionId);
+console.log(sectionId, 'sectionId');
+    }, [currentProgramStage]);
+
+    if (!sectionsFromProgramStage.length) {
+        return null;
+    }
 
     return (
         <div className={classes.container} data-test="workinglists-table-header-tabs-container">
             <TabBar dataTest="workinglists-table-header-tabs" scrollable>
-                {sectionLabels.map(label => (
+                {sectionsFromProgramStage.map(section => (
                     <Tab
-                        key={label}
-                        selected={activeTab === label}
-                        onClick={() => setActiveTab(label)}
+                        key={section.id}
+                        selected={activeTab === section.id}
+                        onClick={() => handleTabClick(section.id)}
                     >
-                        {label}
+                        {section.name}
                     </Tab>
                 ))}
             </TabBar>

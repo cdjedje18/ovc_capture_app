@@ -48,6 +48,7 @@ const getStyles = (theme: any) => ({
 }) as const;
 
 type OwnProps = {
+    programId: string;
     templates: WorkingListTemplates;
     currentTemplateId: string;
     currentListIsModified: boolean;
@@ -60,6 +61,7 @@ type Props = OwnProps & WithStyles<typeof getStyles>;
 const TemplateSelectorPlain = (props: Props) => {
     const {
         classes,
+        programId,
     } = props;
     const [selectedDate, setSelectedDate] = React.useState<string | undefined>('');
     const isMembersFormPage =
@@ -109,7 +111,7 @@ const TemplateSelectorPlain = (props: Props) => {
                         />
                     </div>
                     <div className={classes.tabsContainer}>
-                        <TableHeaderTabsSelector />
+                        <TableHeaderTabsSelector programId={programId} />
                     </div>
                 </div>
             ) : null}
