@@ -112,7 +112,7 @@ const TemplateSelectorPlain = ({
             dataEntryPrograms?.find(entry => entry.program === programId) ?? dataEntryPrograms?.[0];
         const currentProgram = programCollection.get(currentDataEntryProgram?.program || '');
         const currentProgramStageId = currentDataEntryProgram?.programStage;
-        const currentProgramStage = currentProgramStageId && currentProgram?.getStage(currentProgramStageId);
+        const currentProgramStage = currentProgramStageId ? currentProgram?.getStage(currentProgramStageId) : undefined;
         const stageAny = currentProgramStage as any;
 
         const labelFromStage =

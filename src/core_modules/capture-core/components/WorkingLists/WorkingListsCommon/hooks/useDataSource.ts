@@ -3,6 +3,7 @@ import moment from 'moment';
 import { useDataMutation } from '@dhis2/app-runtime';
 import log from 'loglevel';
 import { errorCreator } from 'capture-core-utils';
+import type { Mutation } from 'capture-core-utils/types/app-runtime';
 import { dataElementTypes, DataElement, OptionSet, Option } from '../../../../metaData';
 import { convertClientToList, convertClientToServer } from '../../../../converters';
 import { generateUID } from '../../../../utils/uid/generateUID';
@@ -10,9 +11,9 @@ import { isMembersFormPage as isMembersFormPageRoute } from '../../utils/isMembe
 import { useSelectedMembersVisitDate } from '../../WorkingListsBase/membersVisitDate.store';
 import { InlineEventCellField } from './InlineEventCellField.component';
 
-const TRACKER_EVENT_MUTATION = {
+const TRACKER_EVENT_MUTATION: Mutation = {
     resource: 'tracker?async=false&importStrategy=CREATE_AND_UPDATE',
-    type: 'create',
+    type: 'create' as const,
     data: payload => payload,
 };
 
