@@ -8,6 +8,12 @@ export type ApiTeiAttributes = Array<{
 export type ApiTei = {
     trackedEntity: string,
     attributes?: ApiTeiAttributes,
+    enrollments?: Array<{
+        enrollment: string,
+        orgUnit: string,
+        program?: string,
+        status?: string,
+    }>,
     programOwners: Array<{
         orgUnit: string,
         program: string,

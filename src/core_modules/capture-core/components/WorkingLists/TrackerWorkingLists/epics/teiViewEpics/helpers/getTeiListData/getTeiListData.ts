@@ -1,7 +1,6 @@
 import { handleAPIResponse, REQUESTED_ENTITIES } from 'capture-core/utils/api';
-import { featureAvailable, FEATURES } from 'capture-core-utils';
+import { featureAvailable, FEATURES, errorCreator } from 'capture-core-utils';
 import log from 'loglevel';
-import { errorCreator } from 'capture-core-utils';
 import { convertServerToClient } from '../../../../../../../converters';
 import { convertToClientTeis } from './convertToClientTeis';
 import {
@@ -16,6 +15,11 @@ import { getFilterApiName } from '../../../../helpers';
 import type { RawQueryArgs } from './types';
 import type { InputMeta } from './getTeiListData.types';
 import type { TeiColumnsMetaForDataFetching, TeiFiltersOnlyMetaForDataFetching } from '../../../../types';
+
+const RECORD_META_KEYS = {
+    programStageId: '__programStageId',
+    eventId: '__eventId',
+} as const;
 
 export const createApiQueryArgs = ({
     page,
@@ -96,22 +100,29 @@ const mergeEventValuesIntoTeis = ({
     clientTeis,
     events,
     columnsMetaForDataFetchingArray,
+    programStageId,
 }: {
     clientTeis: Array<any>,
     events: Array<any>,
     columnsMetaForDataFetchingArray: Array<any>,
+    programStageId?: string,
 }) => {
     const additionalColumns = columnsMetaForDataFetchingArray.filter(column => column.additionalColumn);
-    if (!additionalColumns.length || !events.length) {
-        return clientTeis;
-    }
-
     const latestEventsByTei = getLatestEventByTrackedEntity(events);
 
     return clientTeis.map((tei) => {
         const event = latestEventsByTei[tei.id];
-        if (!event) {
-            return tei;
+
+        const recordWithMeta = {
+            ...tei.record,
+            [RECORD_META_KEYS.programStageId]: programStageId,
+            [RECORD_META_KEYS.eventId]: event?.event,
+        };
+        if (!event || !additionalColumns.length) {
+            return {
+                ...tei,
+                record: recordWithMeta,
+            };
         }
 
         const dataValuesById = (event.dataValues || []).reduce((acc, dataValue) => {
@@ -142,7 +153,7 @@ const mergeEventValuesIntoTeis = ({
         return {
             ...tei,
             record: {
-                ...tei.record,
+                ...recordWithMeta,
                 ...additionalRecord,
             },
         };
@@ -190,6 +201,7 @@ export const getTeiListData = async (
                     clientTeis,
                     events: apiEvents,
                     columnsMetaForDataFetchingArray,
+                    programStageId,
                 });
             } catch (error) {
                 log.warn(errorCreator('Could not enrich TEI list with event values')({ error, programStageId }));
@@ -197,6 +209,14 @@ export const getTeiListData = async (
             }
         }
     }
+
+    enrichedClientTeis = enrichedClientTeis.map(tei => ({
+        ...tei,
+        record: {
+            ...tei.record,
+            [RECORD_META_KEYS.programStageId]: rawQueryArgs.programStageId,
+        },
+    }));
 
     const clientTeisWithSubvalues = await getSubvalues(querySingleResource, absoluteApiPath)(
         enrichedClientTeis,

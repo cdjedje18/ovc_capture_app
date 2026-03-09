@@ -1,8 +1,28 @@
-import { useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
+import moment from 'moment';
+import { useDataMutation } from '@dhis2/app-runtime';
 import log from 'loglevel';
 import { errorCreator } from 'capture-core-utils';
 import { dataElementTypes, DataElement, OptionSet, Option } from '../../../../metaData';
-import { convertClientToList } from '../../../../converters';
+import { convertClientToList, convertClientToServer } from '../../../../converters';
+import { generateUID } from '../../../../utils/uid/generateUID';
+import { isMembersFormPage as isMembersFormPageRoute } from '../../utils/isMembersFormPage';
+import { InlineEventCellField } from './InlineEventCellField.component';
+
+const TRACKER_EVENT_MUTATION = {
+    resource: 'tracker?async=false&importStrategy=CREATE_AND_UPDATE',
+    type: 'create',
+    data: payload => payload,
+};
+
+const EVENT_METADATA_KEYS = {
+    eventId: '__eventId',
+    teiId: '__teiId',
+    enrollmentId: '__enrollmentId',
+    orgUnitId: '__orgUnitId',
+    programId: '__programId',
+    programStageId: '__programStageId',
+} as const;
 
 const createDataElement = (column) => {
     const dataElement = new DataElement((o) => {
@@ -34,6 +54,8 @@ export const useDataSource = (
         [key: string]: any,
     }>,
 ) => {
+    const isMembersFormPage = isMembersFormPageRoute();
+    const [saveEventMutation] = useDataMutation(TRACKER_EVENT_MUTATION);
     const eventRecordsArray = useMemo(() =>
         recordsOrder && records && recordsOrder
             .map(id => ({
@@ -44,6 +66,68 @@ export const useDataSource = (
         recordsOrder,
     ]);
 
+    const persistEventCellValue = useCallback(async ({
+        eventRecord,
+        column,
+        nextClientValue,
+    }: {
+        eventRecord: { [key: string]: any },
+        column: { id: string, type: keyof typeof dataElementTypes },
+        nextClientValue: any,
+    }) => {
+        const existingClientValue = eventRecord[column.id];
+        if (existingClientValue === nextClientValue) {
+            return;
+        }
+
+        const eventId = eventRecord[EVENT_METADATA_KEYS.eventId];
+        const teiId = eventRecord[EVENT_METADATA_KEYS.teiId];
+        const enrollmentId = eventRecord[EVENT_METADATA_KEYS.enrollmentId];
+        const orgUnitId = eventRecord[EVENT_METADATA_KEYS.orgUnitId];
+        const programId = eventRecord[EVENT_METADATA_KEYS.programId];
+        const programStageId = eventRecord[EVENT_METADATA_KEYS.programStageId];
+
+        if (!teiId || !enrollmentId || !orgUnitId || !programId || !programStageId) {
+            log.warn(
+                errorCreator('Could not save event cell value due to missing metadata')({
+                    columnId: column.id,
+                    teiId,
+                    enrollmentId,
+                    orgUnitId,
+                    programId,
+                    programStageId,
+                }),
+            );
+            return;
+        }
+
+        const serverValue = nextClientValue === ''
+            ? ''
+            : convertClientToServer(nextClientValue, column.type);
+        const targetEventId = eventId || generateUID();
+
+        await saveEventMutation({
+            events: [{
+                event: targetEventId,
+                trackedEntity: teiId,
+                enrollment: enrollmentId,
+                orgUnit: orgUnitId,
+                program: programId,
+                programStage: programStageId,
+                status: 'ACTIVE',
+                occurredAt: moment().format('YYYY-MM-DD'),
+                dataValues: [{
+                    dataElement: column.id,
+                    value: serverValue,
+                }],
+            }],
+        });
+
+        if (!eventId) {
+            eventRecord[EVENT_METADATA_KEYS.eventId] = targetEventId;
+        }
+    }, [saveEventMutation]);
+
     return useMemo(() => eventRecordsArray && eventRecordsArray
         .map((eventRecord) => {
             const listRecord = columns
@@ -51,6 +135,30 @@ export const useDataSource = (
                 .reduce((acc, column) => {
                     const { id, type, options, resolveValue } = column;
                     const clientValue = eventRecord[id];
+                    if (isMembersFormPage && column.additionalColumn) {
+                        acc[id] = React.createElement(InlineEventCellField, {
+                            key: `${eventRecord.id}-${id}`,
+                            column,
+                            value: clientValue,
+                            onCommit: (nextClientValue: any) => {
+                                persistEventCellValue({
+                                    eventRecord,
+                                    column,
+                                    nextClientValue,
+                                }).catch((error) => {
+                                    log.error(
+                                        errorCreator('Could not persist inline event value')({
+                                            error,
+                                            columnId: id,
+                                            rowId: eventRecord.id,
+                                        }),
+                                    );
+                                });
+                            },
+                        });
+                        return acc;
+                    }
+
                     if (resolveValue) {
                         acc[id] = resolveValue()[clientValue];
                     } else if (options) {
@@ -85,5 +193,7 @@ export const useDataSource = (
         }), [
         eventRecordsArray,
         columns,
+        isMembersFormPage,
+        persistEventCellValue,
     ]);
 };
