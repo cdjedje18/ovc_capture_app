@@ -14,6 +14,7 @@ import type { TrackerWorkingListsColumnConfigs } from '../types';
 import { buildArgumentsForTemplate } from '../helpers';
 
 const DEFAULT_TEMPLATES_LENGTH = 1;
+const FIXED_PROGRAM_STAGE_ID = 'wYTF0YCHMWr';
 
 const shouldPreserveViewState = ({
     currentTemplateId,
@@ -64,12 +65,13 @@ export const TrackerWorkingListsSetup = ({
     bulkActionBarComponent,
     ...passOnProps
 }: Props) => {
-    const prevProgramStageId = useRef(programStageId);
+    const effectiveProgramStageId = programStageId || FIXED_PROGRAM_STAGE_ID;
+    const prevProgramStageId = useRef(effectiveProgramStageId);
     const prevTemplateId = useRef(currentTemplateId);
-    const defaultColumns = useDefaultColumnConfig(program, orgUnitId, programStageId);
+    const defaultColumns = useDefaultColumnConfig(program, orgUnitId, effectiveProgramStageId);
     const columns = useColumns<TrackerWorkingListsColumnConfigs>(customColumnOrder, defaultColumns);
-    const filtersOnly = useFiltersOnly(program, programStageId);
-    const programStageFiltersOnly = useProgramStageFilters(program, programStageId);
+    const filtersOnly = useFiltersOnly(program, effectiveProgramStageId);
+    const programStageFiltersOnly = useProgramStageFilters(program, effectiveProgramStageId);
     const staticTemplates = useStaticTemplates(
         storedTemplates?.find(storedTemplate => storedTemplate.isDefault && storedTemplate.isAltered),
         `${program.id}-default`,
@@ -86,7 +88,7 @@ export const TrackerWorkingListsSetup = ({
     });
 
     useEffect(() => {
-        const viewHasProgramStageChanges = viewHasChanges && programStageId !== prevProgramStageId.current;
+        const viewHasProgramStageChanges = viewHasChanges && effectiveProgramStageId !== prevProgramStageId.current;
 
         if (viewHasProgramStageChanges) {
             onResetListColumnOrder && onResetListColumnOrder();
@@ -95,7 +97,7 @@ export const TrackerWorkingListsSetup = ({
                 shouldPreserveViewState({
                     currentTemplateId,
                     defaultTemplateId,
-                    programStageId,
+                    programStageId: effectiveProgramStageId,
                     prevProgramStageId,
                     prevTemplateId,
                 })
@@ -108,16 +110,16 @@ export const TrackerWorkingListsSetup = ({
                     sortById,
                     sortByDirection,
                     programId: program.id,
-                    programStageId,
+                    programStageId: effectiveProgramStageId,
                 });
 
                 onPreserveCurrentViewState(defaultTemplateId, criteria);
             }
         }
         prevTemplateId.current = currentTemplateId;
-        prevProgramStageId.current = programStageId;
+        prevProgramStageId.current = effectiveProgramStageId;
     }, [
-        programStageId,
+        effectiveProgramStageId,
         onResetListColumnOrder,
         viewHasChanges,
         program,
@@ -142,7 +144,7 @@ export const TrackerWorkingListsSetup = ({
                 sortById,
                 sortByDirection,
                 programId: program.id,
-                programStageId,
+                programStageId: effectiveProgramStageId,
             });
             onAddTemplate(name, criteria, data);
         },
@@ -155,7 +157,7 @@ export const TrackerWorkingListsSetup = ({
             sortById,
             sortByDirection,
             program.id,
-            programStageId,
+            effectiveProgramStageId,
         ],
     );
 
@@ -169,7 +171,7 @@ export const TrackerWorkingListsSetup = ({
                 sortById,
                 sortByDirection,
                 programId: program.id,
-                programStageId,
+                programStageId: effectiveProgramStageId,
             });
             onUpdateTemplate(template, criteria, data);
         },
@@ -182,13 +184,13 @@ export const TrackerWorkingListsSetup = ({
             sortById,
             sortByDirection,
             program.id,
-            programStageId,
+            effectiveProgramStageId,
         ],
     );
 
     const injectArgumentsForDeleteTemplate = useCallback(
-        (template: any) => onDeleteTemplate(template, program.id, programStageId),
-        [onDeleteTemplate, program.id, programStageId],
+        (template: any) => onDeleteTemplate(template, program.id, effectiveProgramStageId),
+        [onDeleteTemplate, program.id, effectiveProgramStageId],
     );
 
     return (
@@ -218,7 +220,7 @@ export const TrackerWorkingListsSetup = ({
                 onUpdateList,
             )}
             programId={program.id}
-            programStageId={programStageId}
+            programStageId={effectiveProgramStageId}
             rowIdKey="id"
             orgUnitId={orgUnitId}
             currentViewHasTemplateChanges={viewHasChanges}

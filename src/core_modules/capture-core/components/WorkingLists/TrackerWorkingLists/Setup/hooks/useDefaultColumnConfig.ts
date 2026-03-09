@@ -37,13 +37,13 @@ const getProgramStageMainConfig = (programStage): Array<MetadataColumnConfig> =>
     [
         {
             id: ADDITIONAL_FILTERS.status,
-            visible: true,
+            visible: false,
             type: dataElementTypes.TEXT,
             header: i18n.t(ADDITIONAL_FILTERS_LABELS.status),
         },
         {
             id: ADDITIONAL_FILTERS.occurredAt,
-            visible: true,
+            visible: false,
             type: dataElementTypes.DATE,
             header: programStage.stageForm.getLabel('occurredAt') || i18n.t(ADDITIONAL_FILTERS_LABELS.occurredAt),
         },
@@ -51,7 +51,7 @@ const getProgramStageMainConfig = (programStage): Array<MetadataColumnConfig> =>
             ? [
                 {
                     id: ADDITIONAL_FILTERS.scheduledAt,
-                    visible: true,
+                    visible: false,
                     type: dataElementTypes.DATE,
                     header:
                         programStage.stageForm.getLabel('scheduledAt') ||
@@ -61,7 +61,7 @@ const getProgramStageMainConfig = (programStage): Array<MetadataColumnConfig> =>
             : []),
         {
             id: ADDITIONAL_FILTERS.orgUnit,
-            visible: true,
+            visible: false,
             type: dataElementTypes.ORGANISATION_UNIT,
             header: ADDITIONAL_FILTERS_LABELS.orgUnit,
             apiViewName: 'eventOrgUnit',
@@ -70,7 +70,7 @@ const getProgramStageMainConfig = (programStage): Array<MetadataColumnConfig> =>
             ? [
                 {
                     id: ADDITIONAL_FILTERS.assignedUser,
-                    visible: true,
+                    visible: false,
                     type: dataElementTypes.ASSIGNEE,
                     header: i18n.t(ADDITIONAL_FILTERS_LABELS.assignee),
                 },
