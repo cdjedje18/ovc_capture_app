@@ -68,7 +68,7 @@ class Index extends React.Component<Props & RouteComponentProps> {
         const query = this.props.location.search;
         console.log("Current path:", query);
         const params = Object.fromEntries(new URLSearchParams(query));
-        this.props.history.push(`/membersForm?${buildUrlQueryString({ ...params, masterTEI: row.id })}`);
+        this.props.history.push(`/membersForm?${buildUrlQueryString({ ...params, masterTEI: row.id, relationshipType: "UQBorjEE0u5" })}`);
     }
 
     getSortHandler =
