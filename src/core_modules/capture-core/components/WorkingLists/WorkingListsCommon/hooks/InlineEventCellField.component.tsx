@@ -16,6 +16,7 @@ type Props = {
     };
     value: any;
     onCommit: (value: any) => void;
+    disabled?: boolean;
 };
 
 const MULTI_TEXT_SEPARATOR = ',';
@@ -37,6 +38,7 @@ export const InlineEventCellField = React.memo(({
     column,
     value,
     onCommit,
+    disabled,
 }: Props) => {
     const [localValue, setLocalValue] = useState<any>(value ?? null);
 
@@ -54,9 +56,12 @@ export const InlineEventCellField = React.memo(({
     );
 
     const commit = useCallback((nextValue: any) => {
+        if (disabled) {
+            return;
+        }
         setLocalValue(nextValue);
         onCommit(nextValue);
-    }, [onCommit]);
+    }, [onCommit, disabled]);
 
     const commonStyle = { minWidth: 180 };
 
@@ -69,6 +74,7 @@ export const InlineEventCellField = React.memo(({
                     onChange={setLocalValue}
                     onBlur={commit}
                     clearable
+                    disabled={disabled}
                 />
             </div>
         );
@@ -86,6 +92,7 @@ export const InlineEventCellField = React.memo(({
                     value={multiValue}
                     onSelect={setLocalValue}
                     onBlur={commit}
+                    disabled={disabled}
                 />
             </div>
         );
@@ -100,6 +107,7 @@ export const InlineEventCellField = React.memo(({
                     onBlur={commit}
                     orientation={orientations.HORIZONTAL}
                     width={180}
+                    disabled={disabled}
                 />
             </div>
         );
@@ -111,6 +119,7 @@ export const InlineEventCellField = React.memo(({
                 <BooleanField
                     value={localValue}
                     onBlur={commit}
+                    disabled={disabled}
                 />
             </div>
         );
@@ -122,6 +131,7 @@ export const InlineEventCellField = React.memo(({
                 <TrueOnlyField
                     value={localValue}
                     onBlur={commit}
+                    disabled={disabled}
                 />
             </div>
         );
@@ -133,6 +143,7 @@ export const InlineEventCellField = React.memo(({
                 value={localValue ?? ''}
                 onChange={setLocalValue}
                 onBlur={commit}
+                disabled={disabled}
             />
         </div>
     );

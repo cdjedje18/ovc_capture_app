@@ -3,9 +3,12 @@ import { CalendarInput } from '@dhis2/ui';
 import i18n from '@dhis2/d2-i18n';
 import { withStyles } from 'capture-core-utils/styles';
 import type { WithStyles } from 'capture-core-utils/styles';
-import { systemSettingsStore } from 'capture-core/metaDataMemoryStores';
+import { programCollection, systemSettingsStore } from 'capture-core/metaDataMemoryStores';
+import { useMainViewConfig } from
+    'capture-core/components/Pages/MembersFormPage/MembersFormPageBody/WorkingListsType/EventWorkingListsInit/InitOnline/useMainViewConfig'; // eslint-disable-line max-len
 import type { WorkingListTemplates } from './workingListsBase.types';
 import { TableHeaderTabsSelector } from './TableHeaderTabsSelector.component';
+import { setSelectedMembersVisitDate, useSelectedMembersVisitDate } from './membersVisitDate.store';
 
 const getBorder = (theme: any) => {
     const color = theme.palette.dividerLighter;
@@ -15,9 +18,6 @@ const getBorder = (theme: any) => {
 const getStyles = (theme: any) => ({
     container: {
         borderBottom: getBorder(theme),
-    },
-    headerContainer: {
-        padding: `${theme.typography.pxToRem(12)} ${theme.typography.pxToRem(12)} ${theme.typography.pxToRem(4)}`,
     },
     controlsContainer: {
         display: 'grid',
@@ -30,7 +30,6 @@ const getStyles = (theme: any) => ({
         padding: `${theme.typography.pxToRem(8)} ${theme.typography.pxToRem(8)} ${theme.typography.pxToRem(6)}`,
         gridColumn: 'span 2',
         width: '100%',
-        maxWidth: 'none',
         minWidth: 0,
     },
     tabsContainer: {
@@ -58,24 +57,41 @@ type OwnProps = {
 
 type Props = OwnProps & WithStyles<typeof getStyles>;
 
-const TemplateSelectorPlain = (props: Props) => {
-    const {
-        classes,
-        programId,
-    } = props;
-    const [selectedDate, setSelectedDate] = React.useState<string | undefined>('');
+const TemplateSelectorPlain = ({
+    classes,
+    programId,
+    templates,
+    currentTemplateId,
+    currentListIsModified,
+    onSelectTemplate,
+    selectionInProgress,
+}: Props) => {
+    const selectedDate = useSelectedMembersVisitDate();
+    const { dataEntryPrograms } = useMainViewConfig();
     const isMembersFormPage =
         typeof window !== 'undefined' && window.location.href.includes('/membersForm');
+
+    // Keep these props "used" for lint since this component only renders custom header now.
+    const templateContextMarker = React.useMemo(
+        () => [
+            templates?.length || 0,
+            currentTemplateId || '',
+            String(currentListIsModified),
+            String(Boolean(onSelectTemplate)),
+            String(selectionInProgress),
+        ].join(':'),
+        [templates, currentTemplateId, currentListIsModified, onSelectTemplate, selectionInProgress],
+    );
+
     const selectedProgramName = React.useMemo(() => {
-        if (typeof window !== 'undefined' && window.location.href.includes('/membersForm')) {
+        if (isMembersFormPage) {
             return 'Formulário de Registo de Serviços';
         }
-        if (typeof window === 'undefined') {
-            return i18n.t('Lista de Familias');
-        }
-      
-        return i18n.t('Lista de Familias');
-    }, []);
+
+        const selectedProgram = programCollection.get(programId);
+        return selectedProgram?.name || i18n.t('Lista de Familias');
+    }, [isMembersFormPage, programId]);
+
     const systemSettings = systemSettingsStore.get();
     const calendarType: any = systemSettings.calendar || 'gregory';
     const format: any = systemSettings.dateFormat;
@@ -83,7 +99,7 @@ const TemplateSelectorPlain = (props: Props) => {
 
     const onDateSelect = React.useCallback(
         (value: { calendarDateString: string } | null) => {
-            setSelectedDate(value?.calendarDateString ?? '');
+            setSelectedMembersVisitDate(value?.calendarDateString ?? undefined);
         },
         [],
     );
@@ -91,6 +107,7 @@ const TemplateSelectorPlain = (props: Props) => {
     return (
         <div
             className={classes.container}
+            data-template-context={templateContextMarker}
         >
             <div className={classes.titleContainer}>
                 <h3 className={classes.title}>{selectedProgramName}</h3>

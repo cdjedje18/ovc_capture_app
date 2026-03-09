@@ -7,6 +7,7 @@ import { dataElementTypes, DataElement, OptionSet, Option } from '../../../../me
 import { convertClientToList, convertClientToServer } from '../../../../converters';
 import { generateUID } from '../../../../utils/uid/generateUID';
 import { isMembersFormPage as isMembersFormPageRoute } from '../../utils/isMembersFormPage';
+import { useSelectedMembersVisitDate } from '../../WorkingListsBase/membersVisitDate.store';
 import { InlineEventCellField } from './InlineEventCellField.component';
 
 const TRACKER_EVENT_MUTATION = {
@@ -55,6 +56,8 @@ export const useDataSource = (
     }>,
 ) => {
     const isMembersFormPage = isMembersFormPageRoute();
+    const selectedMembersVisitDate = useSelectedMembersVisitDate();
+    const isMembersFormLocked = isMembersFormPage && !selectedMembersVisitDate;
     const [saveEventMutation] = useDataMutation(TRACKER_EVENT_MUTATION);
     const eventRecordsArray = useMemo(() =>
         recordsOrder && records && recordsOrder
@@ -77,6 +80,9 @@ export const useDataSource = (
     }) => {
         const existingClientValue = eventRecord[column.id];
         if (existingClientValue === nextClientValue) {
+            return;
+        }
+        if (isMembersFormPage && !selectedMembersVisitDate) {
             return;
         }
 
@@ -115,7 +121,7 @@ export const useDataSource = (
                 program: programId,
                 programStage: programStageId,
                 status: 'ACTIVE',
-                occurredAt: moment().format('YYYY-MM-DD'),
+                occurredAt: selectedMembersVisitDate || moment().format('YYYY-MM-DD'),
                 dataValues: [{
                     dataElement: column.id,
                     value: serverValue,
@@ -126,7 +132,7 @@ export const useDataSource = (
         if (!eventId) {
             eventRecord[EVENT_METADATA_KEYS.eventId] = targetEventId;
         }
-    }, [saveEventMutation]);
+    }, [isMembersFormPage, saveEventMutation, selectedMembersVisitDate]);
 
     return useMemo(() => eventRecordsArray && eventRecordsArray
         .map((eventRecord) => {
@@ -140,6 +146,7 @@ export const useDataSource = (
                             key: `${eventRecord.id}-${id}`,
                             column,
                             value: clientValue,
+                            disabled: isMembersFormLocked,
                             onCommit: (nextClientValue: any) => {
                                 persistEventCellValue({
                                     eventRecord,
@@ -194,6 +201,7 @@ export const useDataSource = (
         eventRecordsArray,
         columns,
         isMembersFormPage,
+        isMembersFormLocked,
         persistEventCellValue,
     ]);
 };
