@@ -15,11 +15,98 @@ import { getFilterApiName } from '../../../../helpers';
 import type { RawQueryArgs } from './types';
 import type { InputMeta } from './getTeiListData.types';
 import type { TeiColumnsMetaForDataFetching, TeiFiltersOnlyMetaForDataFetching } from '../../../../types';
+import { isMembersFormPage as isMembersFormPageRoute } from '../../../../../utils/isMembersFormPage';
+import { getLocationQuery } from '../../../../../../../utils/routing';
+import { determineLinkedEntity } from
+    '../../../../../../WidgetsRelationship/common/RelationshipsWidget/useGroupedLinkedEntities';
 
 const RECORD_META_KEYS = {
     programStageId: '__programStageId',
     eventId: '__eventId',
 } as const;
+
+type MembersRelationshipParams = {
+    masterTeiId: string;
+    relationshipTypeId: string;
+};
+
+const getTrackedEntitiesQueryParam = () =>
+    (featureAvailable(FEATURES.newEntityFilterQueryParam) ? 'trackedEntities' : 'trackedEntity');
+
+const getJoinedTeiIds = (teiIds: Array<string>) => {
+    const useNewSeparator = featureAvailable(FEATURES.newUIDsSeparator);
+    return teiIds.join(useNewSeparator ? ',' : ';');
+};
+
+const getMembersRelationshipParamsFromUrl = (): MembersRelationshipParams | undefined => {
+    const { masterTEI, relationshipType } = getLocationQuery();
+    if (!masterTEI || !relationshipType) {
+        return undefined;
+    }
+
+    return {
+        masterTeiId: masterTEI,
+        relationshipTypeId: relationshipType,
+    };
+};
+
+const getRelatedTeiIdsByMaster = async ({
+    masterTeiId,
+    relationshipTypeId,
+    querySingleResource,
+}: {
+    masterTeiId: string,
+    relationshipTypeId: string,
+    querySingleResource: InputMeta['querySingleResource'],
+}): Promise<Array<string>> => {
+    const supportForNewPaging = featureAvailable(FEATURES.newPagingQueryParam);
+    const apiResponse = await querySingleResource({
+        resource: 'tracker/relationships',
+        params: {
+            trackedEntity: masterTeiId,
+            fields: 'relationshipType,from[trackedEntity[trackedEntity]],to[trackedEntity[trackedEntity]]',
+            ...(supportForNewPaging ? { paging: false } : { skipPaging: true }),
+        },
+    });
+
+    const relationships = handleAPIResponse(REQUESTED_ENTITIES.relationships, apiResponse) as Array<any>;
+
+    const relatedTeiIds = relationships.reduce((acc: Set<string>, relationship: any) => {
+        if (relationship.relationshipType !== relationshipTypeId) {
+            return acc;
+        }
+
+        const linkedEntity = determineLinkedEntity(relationship?.from, relationship?.to, masterTeiId);
+        const linkedTeiId = linkedEntity?.trackedEntity?.trackedEntity;
+        if (linkedTeiId) {
+            acc.add(linkedTeiId);
+        }
+
+        return acc;
+    }, new Set<string>());
+
+    return Array.from(relatedTeiIds);
+};
+
+const getMembersFamilyTeiIds = async (
+    querySingleResource: InputMeta['querySingleResource'],
+): Promise<Array<string> | undefined> => {
+    if (!isMembersFormPageRoute()) {
+        return undefined;
+    }
+
+    const relationshipParams = getMembersRelationshipParamsFromUrl();
+    if (!relationshipParams) {
+        return [];
+    }
+
+    const { masterTeiId, relationshipTypeId } = relationshipParams;
+    return getRelatedTeiIdsByMaster({
+        masterTeiId,
+        relationshipTypeId,
+        querySingleResource,
+    });
+};
 
 export const createApiQueryArgs = ({
     page,
@@ -32,6 +119,7 @@ export const createApiQueryArgs = ({
 }: RawQueryArgs,
 columnsMetaForDataFetching: TeiColumnsMetaForDataFetching,
 filtersOnlyMetaForDataFetching: TeiFiltersOnlyMetaForDataFetching,
+trackedEntityIds?: Array<string>,
 ): { [key: string]: any } => {
     const orgUnitModeQueryParam: string = featureAvailable(FEATURES.newOrgUnitModeQueryParam)
         ? 'orgUnitMode'
@@ -50,6 +138,9 @@ filtersOnlyMetaForDataFetching: TeiFiltersOnlyMetaForDataFetching,
         [orgUnitQueryParam]: orgUnitId,
         [orgUnitModeQueryParam]: orgUnitId ? 'SELECTED' : 'ACCESSIBLE',
         program,
+        ...(trackedEntityIds?.length
+            ? { [getTrackedEntitiesQueryParam()]: getJoinedTeiIds(trackedEntityIds) }
+            : {}),
         fields: ':all,!relationships,programOwners[orgUnit,program]',
     };
 };
@@ -168,15 +259,39 @@ export const getTeiListData = async (
         absoluteApiPath,
     }: InputMeta,
 ) => {
-    const { url, queryParams } = {
-        url: 'tracker/trackedEntities',
-        queryParams: createApiQueryArgs(rawQueryArgs, columnsMetaForDataFetching, filtersOnlyMetaForDataFetching),
-    };
+    const url = 'tracker/trackedEntities';
+    let trackedEntityIdsForMembers: Array<string> | undefined;
 
-    const apiResponse = await querySingleResource({
-        resource: url,
-        params: queryParams,
-    });
+    try {
+        trackedEntityIdsForMembers = await getMembersFamilyTeiIds(querySingleResource);
+    } catch (error) {
+        const relationshipParams = getMembersRelationshipParamsFromUrl();
+        log.error(errorCreator('Could not get related members from master relationship')({
+            error,
+            masterTeiId: relationshipParams?.masterTeiId,
+            relationshipTypeId: relationshipParams?.relationshipTypeId,
+        }));
+        trackedEntityIdsForMembers = [];
+    }
+
+    const queryParams = createApiQueryArgs(
+        rawQueryArgs,
+        columnsMetaForDataFetching,
+        filtersOnlyMetaForDataFetching,
+        trackedEntityIdsForMembers,
+    );
+
+    if (Array.isArray(trackedEntityIdsForMembers) && trackedEntityIdsForMembers.length === 0) {
+        return {
+            recordContainers: [],
+            request: {
+                url,
+                queryParams,
+            },
+        };
+    }
+
+    const apiResponse = await querySingleResource({ resource: url, params: queryParams });
     const apiTrackedEntities = handleAPIResponse(REQUESTED_ENTITIES.trackedEntities, apiResponse);
     const columnsMetaForDataFetchingArray = [...columnsMetaForDataFetching.values()];
     const clientTeis = convertToClientTeis(apiTrackedEntities, columnsMetaForDataFetchingArray, rawQueryArgs.programId);

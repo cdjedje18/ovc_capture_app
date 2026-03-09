@@ -6,6 +6,8 @@ export type Url = {
     orgUnitId?: string;
     trackedEntityTypeId?: string;
     teiId?: string;
+    masterTEI?: string;
+    relationshipType?: string;
     enrollmentId?: string;
     stageId?: string;
     eventId?: string;
@@ -27,6 +29,8 @@ export const deriveUrlQueries = (state: any) => {
         orgUnitId: routerOrgUnitId,
         trackedEntityTypeId: routerTet,
         teiId,
+        masterTEI,
+        relationshipType,
         enrollmentId,
     } = getLocationQuery();
 
@@ -39,6 +43,8 @@ export const deriveUrlQueries = (state: any) => {
         orgUnitId,
         trackedEntityTypeId,
         teiId,
+        masterTEI,
+        relationshipType,
         enrollmentId,
     };
 };
