@@ -16,6 +16,7 @@ import type { OptionSet } from '../../../metaData';
 import { dataElementTypes } from '../../../metaData';
 import { withRouter, RouteComponentProps } from "react-router-dom";
 import { buildUrlQueryString } from 'capture-core/utils/routing';
+import { withApiUtils } from '../../../HOC';
 
 const getStyles: Readonly<any> = {
     tableContainer: {
@@ -59,16 +60,42 @@ type Props = {
     getCustomEndCellBody?: (row: any, props: Props) => ReactNode;
     customEndCellHeaderStyle?: any;
     customEndCellBodyStyle?: any;
+    querySingleResource: (query: { resource: string; params?: Record<string, any> }) => Promise<any>;
 } & WithStyles<typeof getStyles>;
 
 class Index extends React.Component<Props & RouteComponentProps> {
 
-    myOnClickListRow = (row: any) => {
-        console.log({ row })
+    getDataEntryProgramId = async () => {
+        const response = await this.props.querySingleResource({
+            resource: 'dataStore/ovc_capture_app/data_entry',
+        });
+
+        const programs = response?.programs;
+        if (!Array.isArray(programs)) {
+            return undefined;
+        }
+
+        const firstValidProgram = programs.find((entry: any) => typeof entry?.program === 'string' && entry.program);
+        return firstValidProgram?.program;
+    }
+
+    myOnClickListRow = async (row: any) => {
         const query = this.props.location.search;
-        console.log("Current path:", query);
         const params = Object.fromEntries(new URLSearchParams(query));
-        this.props.history.push(`/membersForm?${buildUrlQueryString({ ...params, masterTEI: row.id, relationshipType: "UQBorjEE0u5" })}`);
+
+        let membersProgramId: string | undefined;
+        try {
+            membersProgramId = await this.getDataEntryProgramId();
+        } catch {
+            membersProgramId = undefined;
+        }
+
+        this.props.history.push(`/membersForm?${buildUrlQueryString({
+            ...params,
+            ...(membersProgramId ? { programId: membersProgramId } : {}),
+            masterTEI: row.id,
+            relationshipType: "UQBorjEE0u5",
+        })}`);
     }
 
     getSortHandler =
@@ -227,4 +254,5 @@ class Index extends React.Component<Props & RouteComponentProps> {
     }
 }
 
-export const OnlineList = withStyles(getStyles as any)(withRouter(Index));
+const OnlineListBase = withStyles(getStyles as any)(withRouter(Index));
+export const OnlineList = withApiUtils(OnlineListBase);
