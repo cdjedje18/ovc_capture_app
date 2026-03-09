@@ -14,8 +14,6 @@ import { withStyles, type WithStyles } from 'capture-core-utils/styles';
 import type { ReactNode } from 'react';
 import type { OptionSet } from '../../../metaData';
 import { dataElementTypes } from '../../../metaData';
-import { withRouter, RouteComponentProps } from "react-router-dom";
-import { buildUrlQueryString } from 'capture-core/utils/routing';
 
 const getStyles: Readonly<any> = {
     tableContainer: {
@@ -61,16 +59,7 @@ type Props = {
     customEndCellBodyStyle?: any;
 } & WithStyles<typeof getStyles>;
 
-class Index extends React.Component<Props & RouteComponentProps> {
-
-    myOnClickListRow = (row: any) => {
-        console.log({ row })
-        const query = this.props.location.search;
-        console.log("Current path:", query);
-        const params = Object.fromEntries(new URLSearchParams(query));
-        this.props.history.push(`/membersForm?${buildUrlQueryString({ ...params, masterTEI: row.id, relationshipType: "UQBorjEE0u5" })}`);
-    }
-
+class Index extends React.Component<Props> {
     getSortHandler =
         (id: string) =>
             ({ direction }: { direction: string }) => {
@@ -181,7 +170,7 @@ class Index extends React.Component<Props & RouteComponentProps> {
                             onRowSelect(row[rowIdKey]);
                             return;
                         }
-                        this.myOnClickListRow(row);
+                        this.props.onRowClick(row);
                     }}
                 >
                     {row[column.id]}
@@ -227,4 +216,4 @@ class Index extends React.Component<Props & RouteComponentProps> {
     }
 }
 
-export const OnlineList = withStyles(getStyles as any)(withRouter(Index));
+export const OnlineList = withStyles(getStyles as any)(Index);
