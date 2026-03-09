@@ -14,7 +14,6 @@ import {
     resetCategoryOption,
     resetAllCategoryOptions,
 } from '../shared/actions/mainPage.actions';
-import { TopBarActions } from '../../../TopBarActions';
 import type { TopBarProps } from './topBar.types';
 
 export const TopBar = ({ programId, orgUnitId, selectedCategories }: TopBarProps) => {
@@ -62,8 +61,6 @@ export const TopBar = ({ programId, orgUnitId, selectedCategories }: TopBarProps
             onResetAllCategoryOptions={dispatchOnResetAllCategoryOptions}
             onResetCategoryOption={dispatchOnResetCategoryOption}
             onStartAgain={() => reset()}
-        >
-            <TopBarActions selectedProgramId={programId} selectedOrgUnitId={orgUnitId} />
-        </ScopeSelector>
+        />
     );
 };
