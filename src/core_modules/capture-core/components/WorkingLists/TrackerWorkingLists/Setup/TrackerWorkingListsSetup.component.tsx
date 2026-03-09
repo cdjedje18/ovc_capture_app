@@ -14,7 +14,7 @@ import type { TrackerWorkingListsColumnConfigs } from '../types';
 import { buildArgumentsForTemplate } from '../helpers';
 
 const DEFAULT_TEMPLATES_LENGTH = 1;
-const FIXED_PROGRAM_STAGE_ID = 'wYTF0YCHMWr';
+const FIXED_PROGRAM_STAGE_ID = 'Oh6StVW1Gc9';
 
 const shouldPreserveViewState = ({
     currentTemplateId,

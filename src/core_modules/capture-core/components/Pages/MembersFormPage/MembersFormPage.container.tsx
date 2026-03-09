@@ -42,13 +42,13 @@ const handleChangeTemplateUrl = ({ programId, orgUnitId, selectedTemplateId, sho
 }) => {
     if (orgUnitId) {
         selectedTemplateId
-            ? navigate(`/?${buildUrlQueryString({ orgUnitId, programId, selectedTemplateId })}`)
-            : navigate(`/?${buildUrlQueryString({ orgUnitId, programId })}`);
+            ? navigate(`/membersForm?${buildUrlQueryString({ orgUnitId, programId, selectedTemplateId })}`)
+            : navigate(`/membersForm?${buildUrlQueryString({ orgUnitId, programId })}`);
     }
     if (showAllAccessible) {
         selectedTemplateId
-            ? navigate(`/?${buildUrlQueryString({ programId, selectedTemplateId })}&all`)
-            : navigate(`/?${buildUrlQueryString({ programId })}&all`);
+            ? navigate(`/membersForm?${buildUrlQueryString({ programId, selectedTemplateId })}&all`)
+            : navigate(`/membersForm?${buildUrlQueryString({ programId })}&all`);
     }
 };
 
@@ -139,7 +139,7 @@ const useCallbackMainPage = ({
     );
 
     const onSetShowAccessible = useCallback(
-        () => navigate(`/?${buildUrlQueryString({ programId: programId || '' })}&all`),
+        () => navigate(`/membersForm?${buildUrlQueryString({ programId: programId || '' })}&all`),
         [navigate, programId],
     );
 

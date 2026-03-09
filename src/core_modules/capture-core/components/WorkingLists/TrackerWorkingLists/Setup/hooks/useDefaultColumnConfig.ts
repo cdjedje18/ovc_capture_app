@@ -33,17 +33,20 @@ const getMainConfig = (hasDisplayInReportsAttributes: boolean): Array<MainColumn
         mainProperty: true,
     }));
 
-const getProgramStageMainConfig = (programStage): Array<MetadataColumnConfig> =>
+const getProgramStageMainConfig = (
+    programStage,
+    hideProgramStageMainColumns: boolean,
+): Array<MetadataColumnConfig> =>
     [
         {
             id: ADDITIONAL_FILTERS.status,
-            visible: false,
+            visible: !hideProgramStageMainColumns,
             type: dataElementTypes.TEXT,
             header: i18n.t(ADDITIONAL_FILTERS_LABELS.status),
         },
         {
             id: ADDITIONAL_FILTERS.occurredAt,
-            visible: false,
+            visible: !hideProgramStageMainColumns,
             type: dataElementTypes.DATE,
             header: programStage.stageForm.getLabel('occurredAt') || i18n.t(ADDITIONAL_FILTERS_LABELS.occurredAt),
         },
@@ -51,7 +54,7 @@ const getProgramStageMainConfig = (programStage): Array<MetadataColumnConfig> =>
             ? [
                 {
                     id: ADDITIONAL_FILTERS.scheduledAt,
-                    visible: false,
+                    visible: !hideProgramStageMainColumns,
                     type: dataElementTypes.DATE,
                     header:
                         programStage.stageForm.getLabel('scheduledAt') ||
@@ -61,7 +64,7 @@ const getProgramStageMainConfig = (programStage): Array<MetadataColumnConfig> =>
             : []),
         {
             id: ADDITIONAL_FILTERS.orgUnit,
-            visible: false,
+            visible: !hideProgramStageMainColumns,
             type: dataElementTypes.ORGANISATION_UNIT,
             header: ADDITIONAL_FILTERS_LABELS.orgUnit,
             apiViewName: 'eventOrgUnit',
@@ -70,7 +73,7 @@ const getProgramStageMainConfig = (programStage): Array<MetadataColumnConfig> =>
             ? [
                 {
                     id: ADDITIONAL_FILTERS.assignedUser,
-                    visible: false,
+                    visible: !hideProgramStageMainColumns,
                     type: dataElementTypes.ASSIGNEE,
                     header: i18n.t(ADDITIONAL_FILTERS_LABELS.assignee),
                 },
@@ -132,6 +135,8 @@ export const useDefaultColumnConfig = (
     useMemo(() => {
         const { attributes, stages } = program;
         const programStage = programStageId && stages.get(programStageId);
+        const isMembersFormPage =
+            typeof window !== 'undefined' && window.location.pathname.includes('/membersForm');
         const hasDisplayInReportsAttributes = attributes.some(attribute => attribute.displayInReports);
 
         const defaultColumns = [
@@ -141,7 +146,7 @@ export const useDefaultColumnConfig = (
 
         if (programStageId && programStage) {
             return defaultColumns.concat([
-                ...getProgramStageMainConfig(programStage),
+                ...getProgramStageMainConfig(programStage, isMembersFormPage),
                 ...getEventsMetaDataConfig(programStage),
             ]);
         }

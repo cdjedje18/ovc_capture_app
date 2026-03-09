@@ -5,8 +5,8 @@ msgstr ""
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1)\n"
-"POT-Creation-Date: 2026-03-08T23:28:15.125Z\n"
-"PO-Revision-Date: 2026-03-08T23:28:15.125Z\n"
+"POT-Creation-Date: 2026-03-09T14:40:03.662Z\n"
+"PO-Revision-Date: 2026-03-09T14:40:03.662Z\n"
 
 msgid "The application could not be loaded."
 msgstr "The application could not be loaded."
@@ -2052,6 +2052,9 @@ msgstr "Save As view"
 
 msgid "View name"
 msgstr "View name"
+
+msgid "Lista de Familias"
+msgstr "Lista de Familias"
 
 msgid "Add to ongoing bulk data entry"
 msgstr "Add to ongoing bulk data entry"
