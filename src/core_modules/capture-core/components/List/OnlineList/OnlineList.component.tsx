@@ -64,6 +64,7 @@ type Props = {
 } & WithStyles<typeof getStyles>;
 
 class Index extends React.Component<Props & RouteComponentProps> {
+    isMembersFormPage = () => this.props.location.pathname.includes('/membersForm');
 
     getDataEntryProgramId = async () => {
         const response = await this.props.querySingleResource({
@@ -206,6 +207,10 @@ class Index extends React.Component<Props & RouteComponentProps> {
                     onClick={() => {
                         if (this.props.isSelectionInProgress) {
                             onRowSelect(row[rowIdKey]);
+                            return;
+                        }
+                        if (this.isMembersFormPage()) {
+                            this.props.onRowClick(row);
                             return;
                         }
                         this.myOnClickListRow(row);

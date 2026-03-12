@@ -71,8 +71,7 @@ export const InlineEventCellField = React.memo(({
                 <SingleSelectField
                     options={optionSetOptions}
                     value={localValue ?? null}
-                    onChange={setLocalValue}
-                    onBlur={commit}
+                    onChange={commit}
                     clearable
                     disabled={disabled}
                 />
@@ -90,8 +89,7 @@ export const InlineEventCellField = React.memo(({
                 <MultiSelectField
                     options={optionSetOptions}
                     value={multiValue}
-                    onSelect={setLocalValue}
-                    onBlur={commit}
+                    onSelect={commit}
                     disabled={disabled}
                 />
             </div>
