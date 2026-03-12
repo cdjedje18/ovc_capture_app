@@ -5,7 +5,10 @@ import { dataElementTypes, type TrackerProgram } from '../../../../../metaData';
 import type { MainColumnConfig, MetadataColumnConfig, TrackerWorkingListsColumnConfigs } from '../../types';
 import { isMembersFormPage as isMembersFormPageRoute } from '../../../utils/isMembersFormPage';
 
-const getMainConfig = (hasDisplayInReportsAttributes: boolean): Array<MainColumnConfig> =>
+const getMainConfig = (
+    hasDisplayInReportsAttributes: boolean,
+    hideInColumnSelector?: boolean,
+): Array<MainColumnConfig> =>
     [
         {
             id: 'programOwnerId',
@@ -32,11 +35,13 @@ const getMainConfig = (hasDisplayInReportsAttributes: boolean): Array<MainColumn
     ].map(field => ({
         ...field,
         mainProperty: true,
+        hideInColumnSelector,
     }));
 
 const getProgramStageMainConfig = (
     programStage,
     hideProgramStageMainColumns: boolean,
+    hideInColumnSelector?: boolean,
 ): Array<MetadataColumnConfig> =>
     [
         {
@@ -85,12 +90,14 @@ const getProgramStageMainConfig = (
         mainProperty: true,
         filterHidden: true,
         additionalColumn: true,
+        hideInColumnSelector,
     }));
 
 const getEventsMetaDataConfig = (
     programStage,
     selectedSectionId?: string,
     forceVisible?: boolean,
+    hideInColumnSelector?: boolean,
 ): Array<MetadataColumnConfig> => {
     const stageForm = programStage.stageForm;
     if (!stageForm) {
@@ -98,7 +105,7 @@ const getEventsMetaDataConfig = (
     }
 
     if (!selectedSectionId) {
-        return getDataValuesMetaDataConfig([...stageForm.getElements()], forceVisible);
+        return getDataValuesMetaDataConfig([...stageForm.getElements()], forceVisible, hideInColumnSelector);
     }
 
     const selectedSection = stageForm.getSection(selectedSectionId);
@@ -113,10 +120,16 @@ const getEventsMetaDataConfig = (
         return acc.concat(element);
     }, []);
 
-    return getDataValuesMetaDataConfig(dataElementsInSection, forceVisible);
+    return getDataValuesMetaDataConfig(dataElementsInSection, forceVisible, hideInColumnSelector);
 };
 
-const getTEIMetaDataConfig = (attributes: Array<any>, orgUnitId: string | null | undefined): Array<MetadataColumnConfig> =>
+const MEMBERS_FORM_VISIBLE_ATTRIBUTE_ID = 'PP0L2IEL4Dm';
+
+const getTEIMetaDataConfig = (
+    attributes: Array<any>,
+    orgUnitId: string | null | undefined,
+    isMembersFormPage?: boolean,
+): Array<MetadataColumnConfig> =>
     attributes.map(({
         id,
         displayInReports,
@@ -129,18 +142,23 @@ const getTEIMetaDataConfig = (attributes: Array<any>, orgUnitId: string | null |
         searchOperator,
         minCharactersToSearch }) => ({
         id,
-        visible: displayInReports,
+        visible: isMembersFormPage ? id === MEMBERS_FORM_VISIBLE_ATTRIBUTE_ID : displayInReports,
         type,
         header: formName || name,
         options: optionSet && optionSet.options.map(({ text, value }) => ({ text, value })),
-        multiValueFilter: !!optionSet || type === dataElementTypes.BOOLEAN,
-        filterHidden: !(orgUnitId || searchable || unique),
+        multiValueFilter: isMembersFormPage ? false : (!!optionSet || type === dataElementTypes.BOOLEAN),
+        filterHidden: isMembersFormPage ? id !== MEMBERS_FORM_VISIBLE_ATTRIBUTE_ID : !(orgUnitId || searchable || unique),
+        hideInColumnSelector: isMembersFormPage ? id !== MEMBERS_FORM_VISIBLE_ATTRIBUTE_ID : false,
         unique: Boolean(unique),
         searchOperator,
         minCharactersToSearch,
     }));
 
-const getDataValuesMetaDataConfig = (dataElements, forceVisible?: boolean): Array<MetadataColumnConfig> =>
+const getDataValuesMetaDataConfig = (
+    dataElements,
+    forceVisible?: boolean,
+    hideInColumnSelector?: boolean,
+): Array<MetadataColumnConfig> =>
     dataElements.map(({ id, displayInReports, type, name, formName, optionSet }) => ({
         id,
         visible: forceVisible ? true : displayInReports,
@@ -149,6 +167,7 @@ const getDataValuesMetaDataConfig = (dataElements, forceVisible?: boolean): Arra
         options: optionSet && optionSet.options.map(({ text, value }) => ({ text, value })),
         multiValueFilter: !!optionSet,
         additionalColumn: true,
+        hideInColumnSelector,
     }));
 
 export const useDefaultColumnConfig = (
@@ -164,18 +183,19 @@ export const useDefaultColumnConfig = (
         const hasDisplayInReportsAttributes = attributes.some(attribute => attribute.displayInReports);
 
         const defaultColumns = [
-            ...getMainConfig(hasDisplayInReportsAttributes),
-            ...getTEIMetaDataConfig(attributes, orgUnitId),
+            ...getMainConfig(hasDisplayInReportsAttributes, isMembersFormPage),
+            ...getTEIMetaDataConfig(attributes, orgUnitId, isMembersFormPage),
         ];
 
         if (programStageId && programStage) {
             const shouldForceVisibleDataElements = isMembersFormPage && !!selectedSectionId;
             return defaultColumns.concat([
-                ...getProgramStageMainConfig(programStage, isMembersFormPage),
+                ...getProgramStageMainConfig(programStage, isMembersFormPage, false),
                 ...getEventsMetaDataConfig(
                     programStage,
                     isMembersFormPage ? selectedSectionId : undefined,
                     shouldForceVisibleDataElements,
+                    false,
                 ),
             ]);
         }

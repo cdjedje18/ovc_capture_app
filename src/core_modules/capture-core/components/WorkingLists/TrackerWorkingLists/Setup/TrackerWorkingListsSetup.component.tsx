@@ -101,8 +101,16 @@ export const TrackerWorkingListsSetup = ({
         isMembersFormPage ? undefined : selectedSectionIdForColumns,
     );
     const columns = useColumns<TrackerWorkingListsColumnConfigs>(customColumnOrder, defaultColumns);
-    const filtersOnly = useFiltersOnly(program, effectiveProgramStageId);
-    const programStageFiltersOnly = useProgramStageFilters(program, effectiveProgramStageId);
+    const baseFiltersOnly = useFiltersOnly(program, effectiveProgramStageId);
+    const baseProgramStageFiltersOnly = useProgramStageFilters(program, effectiveProgramStageId);
+    const filtersOnly = useMemo(
+        () => (isMembersFormPage ? [] : baseFiltersOnly),
+        [isMembersFormPage, baseFiltersOnly],
+    );
+    const programStageFiltersOnly = useMemo(
+        () => (isMembersFormPage ? [] : baseProgramStageFiltersOnly),
+        [isMembersFormPage, baseProgramStageFiltersOnly],
+    );
     const staticTemplates = useStaticTemplates(
         storedTemplates?.find(storedTemplate => storedTemplate.isDefault && storedTemplate.isAltered),
         `${program.id}-default`,
