@@ -20,6 +20,8 @@ const styles = {
 
 const MainPageComponentPlain = ({
     programId,
+    sourceProgramId,
+    entryProgramId,
     orgUnitId,
     selectedCategories,
     mainPageStatus,
@@ -40,7 +42,12 @@ const MainPageComponentPlain = ({
             [classes.containerBulkDataEntry]: mainPageStatus === MainPageStatuses.SHOW_BULK_DATA_ENTRY_PLUGIN,
         })}
     >
-        <TopBar programId={programId} orgUnitId={orgUnitId} selectedCategories={selectedCategories} />
+        <TopBar
+            sourceProgramId={sourceProgramId}
+            entryProgramId={entryProgramId}
+            orgUnitId={orgUnitId}
+            selectedCategories={selectedCategories}
+        />
         <MembersFormPageBody
             mainPageStatus={mainPageStatus}
             programId={programId || ''}

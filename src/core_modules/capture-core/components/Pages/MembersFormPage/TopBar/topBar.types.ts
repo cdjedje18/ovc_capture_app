@@ -1,5 +1,6 @@
 export type TopBarProps = {
-    programId?: string;
+    sourceProgramId?: string;
+    entryProgramId?: string;
     orgUnitId?: string;
     selectedCategories?: any;
 };

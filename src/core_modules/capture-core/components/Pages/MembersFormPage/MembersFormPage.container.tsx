@@ -270,6 +270,8 @@ const MainPageContainer = () => {
         <OrgUnitFetcher orgUnitId={orgUnitId} error={error}>
             <MembersFormPageComponent
                 programId={programId}
+                sourceProgramId={sourceProgramId}
+                entryProgramId={programId}
                 orgUnitId={orgUnitId}
                 selectedCategories={selectedCategories}
                 mainPageStatus={mainPageStatus}

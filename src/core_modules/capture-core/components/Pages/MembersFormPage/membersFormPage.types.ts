@@ -1,5 +1,7 @@
 export type MainPageComponentProps = {
     programId: string;
+    sourceProgramId?: string;
+    entryProgramId?: string;
     orgUnitId?: string;
     selectedCategories: any
     selectedTemplateId?: string;

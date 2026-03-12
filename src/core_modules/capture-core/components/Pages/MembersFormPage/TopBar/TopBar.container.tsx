@@ -3,6 +3,7 @@ import { useDataQuery } from '@dhis2/app-runtime';
 // @ts-expect-error - SelectorBarItem is available at runtime, but its TypeScript definition is not exposed by the UI library
 import { SelectorBarItem } from '@dhis2/ui';
 import { FEATURES, featureAvailable } from 'capture-core-utils';
+import { programCollection } from 'capture-core/metaDataMemoryStores/programCollection/programCollection';
 import { useDispatch } from 'react-redux';
 import {
     ScopeSelector,
@@ -20,6 +21,7 @@ import {
 } from '../shared/actions/mainPage.actions';
 import type { TopBarProps } from './topBar.types';
 import { useLocationQuery } from 'capture-core/utils/routing';
+import { OptionLabel } from '../../../ScopeSelector/OptionLabel';
 
 const FAMILY_NAME_ATTRIBUTE_ID = 'a8GQzSXuCH7';
 
@@ -35,9 +37,10 @@ const masterTeiQuery: any = {
     },
 };
 
-export const TopBar = ({ programId, orgUnitId, selectedCategories }: TopBarProps) => {
+export const TopBar = ({ sourceProgramId, entryProgramId, orgUnitId, selectedCategories }: TopBarProps) => {
     const dispatch = useDispatch();
     const { masterTEI } = useLocationQuery();
+    const entryProgram = entryProgramId ? programCollection.get(entryProgramId) : null;
     const { setProgramId } = useSetProgramId();
     const { setOrgUnitId } = useSetOrgUnitId();
     const { resetProgramIdAndSelectedTemplateId } = useResetProgramId();
@@ -86,7 +89,7 @@ export const TopBar = ({ programId, orgUnitId, selectedCategories }: TopBarProps
 
     return (
         <ScopeSelector
-            selectedProgramId={programId}
+            selectedProgramId={sourceProgramId}
             selectedOrgUnitId={orgUnitId}
             selectedCategories={selectedCategories}
             onSetProgramId={id => setProgramId(id)}
@@ -98,6 +101,11 @@ export const TopBar = ({ programId, orgUnitId, selectedCategories }: TopBarProps
             onResetCategoryOption={dispatchOnResetCategoryOption}
             onStartAgain={() => reset()}
         >
+            <SelectorBarItem
+                label="Entry program"
+                value={entryProgram && <OptionLabel icon={entryProgram.icon} label={entryProgram.name} />}
+                displayOnly
+            />
             <SelectorBarItem
                 label="Familia"
                 value={selectedFamilyName || ''}
