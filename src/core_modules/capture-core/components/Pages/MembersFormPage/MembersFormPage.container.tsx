@@ -33,22 +33,35 @@ const mapStateToProps = (state: ReduxState) => ({
     ready: !state.activePage.lockedSelectorLoads,  // TODO: Should probably remove this
 });
 
-const handleChangeTemplateUrl = ({ programId, orgUnitId, selectedTemplateId, showAllAccessible, navigate }: {
-    programId: string;
+const handleChangeTemplateUrl = ({
+    sourceProgramId,
+    entryProgram,
+    orgUnitId,
+    selectedTemplateId,
+    showAllAccessible,
+    navigate,
+}: {
+    sourceProgramId?: string;
+    entryProgram: string;
     orgUnitId?: string;
     selectedTemplateId?: string;
     showAllAccessible: boolean;
     navigate: (url: string) => void;
 }) => {
+    const query = {
+        ...(sourceProgramId ? { programId: sourceProgramId } : {}),
+        entryProgram,
+    };
+
     if (orgUnitId) {
         selectedTemplateId
-            ? navigate(`/membersForm?${buildUrlQueryString({ orgUnitId, programId, selectedTemplateId })}`)
-            : navigate(`/membersForm?${buildUrlQueryString({ orgUnitId, programId })}`);
+            ? navigate(`/membersForm?${buildUrlQueryString({ ...query, orgUnitId, selectedTemplateId })}`)
+            : navigate(`/membersForm?${buildUrlQueryString({ ...query, orgUnitId })}`);
     }
     if (showAllAccessible) {
         selectedTemplateId
-            ? navigate(`/membersForm?${buildUrlQueryString({ programId, selectedTemplateId })}&all`)
-            : navigate(`/membersForm?${buildUrlQueryString({ programId })}&all`);
+            ? navigate(`/membersForm?${buildUrlQueryString({ ...query, selectedTemplateId })}&all`)
+            : navigate(`/membersForm?${buildUrlQueryString(query)}&all`);
     }
 };
 
@@ -114,14 +127,16 @@ const useSelectorMainPage = () =>
 
 const useCallbackMainPage = ({
     orgUnitId,
-    programId,
+    sourceProgramId,
+    entryProgram,
     showAllAccessible,
     navigate,
     setShowBulkDataEntryPlugin,
     setBulkDataEntryTrackedEntityIds,
 }: {
     orgUnitId?: string;
-    programId?: string;
+    sourceProgramId?: string;
+    entryProgram?: string;
     showAllAccessible: boolean;
     navigate: (url: string) => void;
     setShowBulkDataEntryPlugin: (show: boolean) => void;
@@ -129,18 +144,22 @@ const useCallbackMainPage = ({
 }) => {
     const onChangeTemplate = useCallback(
         (id?: string) => handleChangeTemplateUrl({
-            programId: programId || '',
+            sourceProgramId,
+            entryProgram: entryProgram || '',
             orgUnitId,
             selectedTemplateId: id,
             showAllAccessible,
             navigate,
         }),
-        [navigate, orgUnitId, programId, showAllAccessible],
+        [navigate, orgUnitId, sourceProgramId, entryProgram, showAllAccessible],
     );
 
     const onSetShowAccessible = useCallback(
-        () => navigate(`/membersForm?${buildUrlQueryString({ programId: programId || '' })}&all`),
-        [navigate, programId],
+        () => navigate(`/membersForm?${buildUrlQueryString({
+            ...(sourceProgramId ? { programId: sourceProgramId } : {}),
+            ...(entryProgram ? { entryProgram } : {}),
+        })}&all`),
+        [navigate, sourceProgramId, entryProgram],
     );
 
     const onCloseBulkDataEntryPlugin = useCallback(() => {
@@ -167,7 +186,8 @@ const MainPageContainer = () => {
 
     const dispatch = useDispatch();
     const { navigate } = useNavigate();
-    const { all, programId, orgUnitId, selectedTemplateId } = useLocationQuery();
+    const { all, programId: sourceProgramId, entryProgram, orgUnitId, selectedTemplateId } = useLocationQuery();
+    const programId = entryProgram || sourceProgramId;
     const showAllAccessible = all !== undefined;
 
     const {
@@ -198,7 +218,8 @@ const MainPageContainer = () => {
     const { onChangeTemplate, onSetShowAccessible, onCloseBulkDataEntryPlugin, onOpenBulkDataEntryPlugin } =
         useCallbackMainPage({
             orgUnitId,
-            programId,
+            sourceProgramId,
+            entryProgram: programId,
             showAllAccessible,
             navigate,
             setShowBulkDataEntryPlugin,
@@ -213,7 +234,8 @@ const MainPageContainer = () => {
         if (programId && trackedEntityTypeId && selectedTemplateId === undefined) {
             if (reduxSelectedTemplateId && workingListProgramId === programId) {
                 handleChangeTemplateUrl({
-                    programId,
+                    sourceProgramId,
+                    entryProgram: programId,
                     orgUnitId,
                     selectedTemplateId: reduxSelectedTemplateId,
                     showAllAccessible,
@@ -223,7 +245,8 @@ const MainPageContainer = () => {
             }
             if (!displayFrontPageList) return;
             handleChangeTemplateUrl({
-                programId,
+                sourceProgramId,
+                entryProgram: programId,
                 orgUnitId,
                 selectedTemplateId: `${programId}-default`,
                 showAllAccessible,
@@ -234,6 +257,7 @@ const MainPageContainer = () => {
         selectedTemplateId,
         orgUnitId,
         programId,
+        sourceProgramId,
         showAllAccessible,
         trackedEntityTypeId,
         displayFrontPageList,

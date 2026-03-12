@@ -93,9 +93,9 @@ class Index extends React.Component<Props & RouteComponentProps> {
 
         this.props.history.push(`/membersForm?${buildUrlQueryString({
             ...params,
-            ...(membersProgramId ? { programId: membersProgramId } : {}),
             masterTEI: row.id,
             relationshipType: "UQBorjEE0u5",
+            ...(membersProgramId ? { entryProgram: membersProgramId } : {}),
         })}`);
     }
 
