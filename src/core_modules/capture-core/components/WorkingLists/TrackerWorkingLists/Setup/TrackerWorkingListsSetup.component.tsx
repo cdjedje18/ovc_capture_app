@@ -91,17 +91,15 @@ export const TrackerWorkingListsSetup = ({
     const selectedSectionIdForColumns = isMembersFormPage
         ? (selectedMembersSectionId || defaultSectionId)
         : undefined;
-    const customUpdateTriggerForSection = useMemo(
-        () => (
-            isMembersFormPage
-                ? `${effectiveProgramStageId || ''}:${selectedSectionIdForColumns || ''}`
-                : customUpdateTrigger
-        ),
-        [isMembersFormPage, customUpdateTrigger, effectiveProgramStageId, selectedSectionIdForColumns],
-    );
     const prevProgramStageId = useRef(effectiveProgramStageId);
     const prevTemplateId = useRef(currentTemplateId);
     const defaultColumns = useDefaultColumnConfig(program, orgUnitId, effectiveProgramStageId, selectedSectionIdForColumns);
+    const dataFetchingColumns = useDefaultColumnConfig(
+        program,
+        orgUnitId,
+        effectiveProgramStageId,
+        isMembersFormPage ? undefined : selectedSectionIdForColumns,
+    );
     const columns = useColumns<TrackerWorkingListsColumnConfigs>(customColumnOrder, defaultColumns);
     const filtersOnly = useFiltersOnly(program, effectiveProgramStageId);
     const programStageFiltersOnly = useProgramStageFilters(program, effectiveProgramStageId);
@@ -232,13 +230,13 @@ export const TrackerWorkingListsSetup = ({
     );
     const dataSource = useDataSource(records, recordsOrder, columns);
     const onLoadViewWithMeta = useInjectDataFetchingMetaToLoadList(
-        defaultColumns,
+        dataFetchingColumns,
         filtersOnly,
         programStageFiltersOnly,
         onLoadView,
     );
     const onUpdateListWithMeta = useInjectDataFetchingMetaToUpdateList(
-        defaultColumns,
+        dataFetchingColumns,
         filtersOnly,
         programStageFiltersOnly,
         onUpdateList,
@@ -250,7 +248,7 @@ export const TrackerWorkingListsSetup = ({
             {...passOnProps}
             forceUpdateOnMount={forceUpdateOnMount}
             currentTemplate={currentTemplate}
-            customUpdateTrigger={customUpdateTriggerForSection}
+            customUpdateTrigger={customUpdateTrigger}
             templates={templates}
             columns={columns}
             onAddTemplate={injectArgumentsForAddTemplate}

@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import moment from 'moment';
 import { useDataMutation } from '@dhis2/app-runtime';
 import log from 'loglevel';
@@ -60,14 +60,17 @@ export const useDataSource = (
     const selectedMembersVisitDate = useSelectedMembersVisitDate();
     const isMembersFormLocked = isMembersFormPage && !selectedMembersVisitDate;
     const [saveEventMutation] = useDataMutation(TRACKER_EVENT_MUTATION);
+    const [recordOverrides, setRecordOverrides] = useState<{ [key: string]: any }>({});
     const eventRecordsArray = useMemo(() =>
         recordsOrder && records && recordsOrder
             .map(id => ({
                 ...records[id],
+                ...(recordOverrides[id] || {}),
                 id,
             })), [
         records,
         recordsOrder,
+        recordOverrides,
     ]);
 
     const persistEventCellValue = useCallback(async ({
@@ -112,23 +115,56 @@ export const useDataSource = (
             ? ''
             : convertClientToServer(nextClientValue, column.type);
         const targetEventId = eventId || generateUID();
+        const rowId = eventRecord.id;
+        const overridePatch = {
+            [column.id]: nextClientValue,
+            ...(!eventId ? { [EVENT_METADATA_KEYS.eventId]: targetEventId } : {}),
+        };
 
-        await saveEventMutation({
-            events: [{
-                event: targetEventId,
-                trackedEntity: teiId,
-                enrollment: enrollmentId,
-                orgUnit: orgUnitId,
-                program: programId,
-                programStage: programStageId,
-                status: 'ACTIVE',
-                occurredAt: selectedMembersVisitDate || moment().format('YYYY-MM-DD'),
-                dataValues: [{
-                    dataElement: column.id,
-                    value: serverValue,
+        setRecordOverrides((currentOverrides) => ({
+            ...currentOverrides,
+            [rowId]: {
+                ...(currentOverrides[rowId] || {}),
+                ...overridePatch,
+            },
+        }));
+
+        try {
+            await saveEventMutation({
+                events: [{
+                    event: targetEventId,
+                    trackedEntity: teiId,
+                    enrollment: enrollmentId,
+                    orgUnit: orgUnitId,
+                    program: programId,
+                    programStage: programStageId,
+                    status: 'ACTIVE',
+                    occurredAt: selectedMembersVisitDate || moment().format('YYYY-MM-DD'),
+                    dataValues: [{
+                        dataElement: column.id,
+                        value: serverValue,
+                    }],
                 }],
-            }],
-        });
+            });
+        } catch (error) {
+            setRecordOverrides((currentOverrides) => {
+                const currentRowOverrides = currentOverrides[rowId] || {};
+                const nextRowOverrides = {
+                    ...currentRowOverrides,
+                    [column.id]: existingClientValue,
+                };
+
+                if (!eventId) {
+                    delete nextRowOverrides[EVENT_METADATA_KEYS.eventId];
+                }
+
+                return {
+                    ...currentOverrides,
+                    [rowId]: nextRowOverrides,
+                };
+            });
+            throw error;
+        }
 
         if (!eventId) {
             eventRecord[EVENT_METADATA_KEYS.eventId] = targetEventId;
