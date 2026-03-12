@@ -126,6 +126,19 @@ export const TrackerWorkingListsSetup = ({
         sortByDirection,
         isDefaultTemplateAltered: storedTemplates?.find(template => template.isDefault)?.isAltered,
     });
+    const membersListReady = !isMembersFormPage || !!effectiveProgramStageId;
+    const membersDataReadyTrigger = useMemo(() => {
+        if (!isMembersFormPage) {
+            return customUpdateTrigger;
+        }
+
+        const dataFetchingColumnIds = dataFetchingColumns.map(column => column.id).join(',');
+        return [
+            customUpdateTrigger || '',
+            effectiveProgramStageId || '',
+            dataFetchingColumnIds,
+        ].join('::');
+    }, [customUpdateTrigger, dataFetchingColumns, effectiveProgramStageId, isMembersFormPage]);
 
     const buildTemplateArgs = useCallback(() => buildArgumentsForTemplate({
         filters,
@@ -251,12 +264,16 @@ export const TrackerWorkingListsSetup = ({
     );
     const onRowClickNoop = useCallback(() => {}, []);
 
+    if (!membersListReady) {
+        return null;
+    }
+
     return (
         <WorkingListsBase
             {...passOnProps}
             forceUpdateOnMount={forceUpdateOnMount}
             currentTemplate={currentTemplate}
-            customUpdateTrigger={customUpdateTrigger}
+            customUpdateTrigger={membersDataReadyTrigger}
             templates={templates}
             columns={columns}
             onAddTemplate={injectArgumentsForAddTemplate}
