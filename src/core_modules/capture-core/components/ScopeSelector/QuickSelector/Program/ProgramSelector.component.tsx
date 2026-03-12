@@ -92,11 +92,11 @@ const ProgramSelectorPlain = ({
     })
 
     useEffect(() => {
-        setProgramsArray(Array.from(programCollection.values()));
+        // setProgramsArray(Array.from(programCollection.values()));
 
-        // if (!selectedProgramId) {
-        //     programsDataStoreQuery.refetch()
-        // }
+        if (!selectedProgramId) {
+            programsDataStoreQuery.refetch()
+        }
 
     }, []);
 
