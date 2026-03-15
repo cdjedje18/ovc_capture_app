@@ -1,15 +1,18 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import moment from 'moment';
-import { useDataMutation } from '@dhis2/app-runtime';
+import { useConfig, useDataMutation } from '@dhis2/app-runtime';
+import { Button } from '@dhis2/ui';
 import log from 'loglevel';
 import { errorCreator } from 'capture-core-utils';
 import type { Mutation } from 'capture-core-utils/types/app-runtime';
 import { dataElementTypes, DataElement, OptionSet, Option } from '../../../../metaData';
 import { convertClientToList, convertClientToServer } from '../../../../converters';
 import { generateUID } from '../../../../utils/uid/generateUID';
+import { buildUrlQueryString } from '../../../../utils/routing';
 import { isMembersFormPage as isMembersFormPageRoute } from '../../utils/isMembersFormPage';
 import { useSelectedMembersVisitDate } from '../../WorkingListsBase/membersVisitDate.store';
 import { InlineEventCellField } from './InlineEventCellField.component';
+import { MEMBERS_CAPTURE_LINK_COLUMN_ID } from '../../TrackerWorkingLists/Setup/hooks/useDefaultColumnConfig';
 
 const TRACKER_EVENT_MUTATION: Mutation = {
     resource: 'tracker?async=false&importStrategy=CREATE_AND_UPDATE',
@@ -25,6 +28,33 @@ const EVENT_METADATA_KEYS = {
     programId: '__programId',
     programStageId: '__programStageId',
 } as const;
+
+const getCaptureEnrollmentUrl = ({
+    baseUrl,
+    enrollmentId,
+    orgUnitId,
+    programId,
+    teiId,
+}: {
+    baseUrl?: string,
+    enrollmentId?: string,
+    orgUnitId?: string,
+    programId?: string,
+    teiId?: string,
+}) => {
+    if (!baseUrl || !enrollmentId || !orgUnitId || !programId || !teiId) {
+        return undefined;
+    }
+
+    const queryString = buildUrlQueryString({
+        enrollmentId,
+        orgUnitId,
+        programId,
+        teiId,
+    });
+
+    return `${baseUrl}/dhis-web-capture/index.html#/enrollment?${queryString}`;
+};
 
 const createDataElement = (column) => {
     const dataElement = new DataElement((o) => {
@@ -59,6 +89,7 @@ export const useDataSource = (
     const isMembersFormPage = isMembersFormPageRoute();
     const selectedMembersVisitDate = useSelectedMembersVisitDate();
     const isMembersFormLocked = isMembersFormPage && !selectedMembersVisitDate;
+    const { baseUrl } = useConfig();
     const [saveEventMutation] = useDataMutation(TRACKER_EVENT_MUTATION);
     const [recordOverrides, setRecordOverrides] = useState<{ [key: string]: any }>({});
     const eventRecordsArray = useMemo(() =>
@@ -178,6 +209,29 @@ export const useDataSource = (
                 .reduce((acc, column) => {
                     const { id, type, options, resolveValue } = column;
                     const clientValue = eventRecord[id];
+                    if (isMembersFormPage && id === MEMBERS_CAPTURE_LINK_COLUMN_ID) {
+                        const captureEnrollmentUrl = getCaptureEnrollmentUrl({
+                            baseUrl,
+                            enrollmentId: eventRecord[EVENT_METADATA_KEYS.enrollmentId],
+                            orgUnitId: eventRecord[EVENT_METADATA_KEYS.orgUnitId],
+                            programId: eventRecord[EVENT_METADATA_KEYS.programId],
+                            teiId: eventRecord[EVENT_METADATA_KEYS.teiId],
+                        });
+
+                        acc[id] = captureEnrollmentUrl
+                            ? React.createElement(
+                                'a',
+                                {
+                                    href: captureEnrollmentUrl,
+                                    target: '_blank',
+                                    rel: 'noopener noreferrer',
+                                },
+                                React.createElement(Button, { small: true }, 'Detalhes'),
+                            )
+                            : null;
+                        return acc;
+                    }
+
                     if (isMembersFormPage && column.additionalColumn) {
                         acc[id] = React.createElement(InlineEventCellField, {
                             key: `${eventRecord.id}-${id}`,
@@ -237,6 +291,7 @@ export const useDataSource = (
         }), [
         eventRecordsArray,
         columns,
+        baseUrl,
         isMembersFormPage,
         isMembersFormLocked,
         persistEventCellValue,

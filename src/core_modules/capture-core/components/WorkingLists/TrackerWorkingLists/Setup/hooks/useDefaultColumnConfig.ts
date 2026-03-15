@@ -124,6 +124,7 @@ const getEventsMetaDataConfig = (
 };
 
 const MEMBERS_FORM_VISIBLE_ATTRIBUTE_ID = 'PP0L2IEL4Dm';
+export const MEMBERS_CAPTURE_LINK_COLUMN_ID = '__membersCaptureLink';
 
 const getTEIMetaDataConfig = (
     attributes: Array<any>,
@@ -185,6 +186,17 @@ export const useDefaultColumnConfig = (
         const defaultColumns = [
             ...getMainConfig(hasDisplayInReportsAttributes, isMembersFormPage),
             ...getTEIMetaDataConfig(attributes, orgUnitId, isMembersFormPage),
+            ...(isMembersFormPage
+                ? [{
+                    id: MEMBERS_CAPTURE_LINK_COLUMN_ID,
+                    visible: true,
+                    type: dataElementTypes.TEXT,
+                    header: i18n.t('Capture App'),
+                    filterHidden: true,
+                    hideInColumnSelector: true,
+                    sortDisabled: true,
+                }]
+                : []),
         ];
 
         if (programStageId && programStage) {
