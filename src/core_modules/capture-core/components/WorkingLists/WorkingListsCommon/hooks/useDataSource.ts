@@ -27,7 +27,18 @@ const EVENT_METADATA_KEYS = {
     orgUnitId: '__orgUnitId',
     programId: '__programId',
     programStageId: '__programStageId',
+    occurredAt: '__occurredAt',
 } as const;
+
+const getEventMetadata = (eventRecord: { [key: string]: any }) => ({
+    eventId: eventRecord[EVENT_METADATA_KEYS.eventId],
+    teiId: eventRecord[EVENT_METADATA_KEYS.teiId],
+    enrollmentId: eventRecord[EVENT_METADATA_KEYS.enrollmentId],
+    orgUnitId: eventRecord[EVENT_METADATA_KEYS.orgUnitId],
+    programId: eventRecord[EVENT_METADATA_KEYS.programId],
+    programStageId: eventRecord[EVENT_METADATA_KEYS.programStageId],
+    occurredAt: eventRecord[EVENT_METADATA_KEYS.occurredAt],
+});
 
 const getCaptureEnrollmentUrl = ({
     baseUrl,
@@ -54,6 +65,71 @@ const getCaptureEnrollmentUrl = ({
     });
 
     return `${baseUrl}/dhis-web-capture/index.html#/enrollment?${queryString}`;
+};
+
+const getOccurredAtWithCurrentTime = (selectedDate?: string) => {
+    const now = moment();
+    if (!selectedDate) {
+        return now.format('YYYY-MM-DDTHH:mm:ss.SSS');
+    }
+
+    const normalizedDate = selectedDate.slice(0, 10);
+    return moment(
+        `${normalizedDate}T${now.format('HH:mm:ss.SSS')}`,
+        'YYYY-MM-DDTHH:mm:ss.SSS',
+    ).format('YYYY-MM-DDTHH:mm:ss.SSS');
+};
+
+const getOccurredAtForSave = ({
+    eventId,
+    existingOccurredAt,
+    selectedMembersVisitDate,
+}: {
+    eventId?: string,
+    existingOccurredAt?: string,
+    selectedMembersVisitDate?: string,
+}) => (eventId ? existingOccurredAt : getOccurredAtWithCurrentTime(selectedMembersVisitDate));
+
+const applyRecordOverridePatch = (
+    currentOverrides: { [key: string]: any },
+    rowId: string,
+    patch: { [key: string]: any },
+) => ({
+    ...currentOverrides,
+    [rowId]: {
+        ...(currentOverrides[rowId] || {}),
+        ...patch,
+    },
+});
+
+const revertRecordOverridePatch = ({
+    currentOverrides,
+    rowId,
+    columnId,
+    existingClientValue,
+    eventId,
+}: {
+    currentOverrides: { [key: string]: any },
+    rowId: string,
+    columnId: string,
+    existingClientValue: any,
+    eventId?: string,
+}) => {
+    const currentRowOverrides = currentOverrides[rowId] || {};
+    const nextRowOverrides = {
+        ...currentRowOverrides,
+        [columnId]: existingClientValue,
+    };
+
+    if (!eventId) {
+        delete nextRowOverrides[EVENT_METADATA_KEYS.eventId];
+        delete nextRowOverrides[EVENT_METADATA_KEYS.occurredAt];
+    }
+
+    return {
+        ...currentOverrides,
+        [rowId]: nextRowOverrides,
+    };
 };
 
 const createDataElement = (column) => {
@@ -121,12 +197,15 @@ export const useDataSource = (
             return;
         }
 
-        const eventId = eventRecord[EVENT_METADATA_KEYS.eventId];
-        const teiId = eventRecord[EVENT_METADATA_KEYS.teiId];
-        const enrollmentId = eventRecord[EVENT_METADATA_KEYS.enrollmentId];
-        const orgUnitId = eventRecord[EVENT_METADATA_KEYS.orgUnitId];
-        const programId = eventRecord[EVENT_METADATA_KEYS.programId];
-        const programStageId = eventRecord[EVENT_METADATA_KEYS.programStageId];
+        const {
+            eventId,
+            teiId,
+            enrollmentId,
+            orgUnitId,
+            programId,
+            programStageId,
+            occurredAt: existingOccurredAt,
+        } = getEventMetadata(eventRecord);
 
         if (!teiId || !enrollmentId || !orgUnitId || !programId || !programStageId) {
             log.warn(
@@ -146,19 +225,33 @@ export const useDataSource = (
             ? ''
             : convertClientToServer(nextClientValue, column.type);
         const targetEventId = eventId || generateUID();
+        const nextOccurredAt = getOccurredAtForSave({
+            eventId,
+            existingOccurredAt,
+            selectedMembersVisitDate,
+        });
         const rowId = eventRecord.id;
+
+        if (eventId && !nextOccurredAt) {
+            log.warn(
+                errorCreator('Could not save existing event because occurredAt is missing')({
+                    eventId,
+                    columnId: column.id,
+                    rowId,
+                }),
+            );
+            return;
+        }
+
         const overridePatch = {
             [column.id]: nextClientValue,
-            ...(!eventId ? { [EVENT_METADATA_KEYS.eventId]: targetEventId } : {}),
+            ...(!eventId ? {
+                [EVENT_METADATA_KEYS.eventId]: targetEventId,
+                [EVENT_METADATA_KEYS.occurredAt]: nextOccurredAt,
+            } : {}),
         };
 
-        setRecordOverrides((currentOverrides) => ({
-            ...currentOverrides,
-            [rowId]: {
-                ...(currentOverrides[rowId] || {}),
-                ...overridePatch,
-            },
-        }));
+        setRecordOverrides(currentOverrides => applyRecordOverridePatch(currentOverrides, rowId, overridePatch));
 
         try {
             await saveEventMutation({
@@ -170,7 +263,7 @@ export const useDataSource = (
                     program: programId,
                     programStage: programStageId,
                     status: 'ACTIVE',
-                    occurredAt: selectedMembersVisitDate || moment().format('YYYY-MM-DD'),
+                    occurredAt: nextOccurredAt,
                     dataValues: [{
                         dataElement: column.id,
                         value: serverValue,
@@ -178,27 +271,19 @@ export const useDataSource = (
                 }],
             });
         } catch (error) {
-            setRecordOverrides((currentOverrides) => {
-                const currentRowOverrides = currentOverrides[rowId] || {};
-                const nextRowOverrides = {
-                    ...currentRowOverrides,
-                    [column.id]: existingClientValue,
-                };
-
-                if (!eventId) {
-                    delete nextRowOverrides[EVENT_METADATA_KEYS.eventId];
-                }
-
-                return {
-                    ...currentOverrides,
-                    [rowId]: nextRowOverrides,
-                };
-            });
+            setRecordOverrides(currentOverrides => revertRecordOverridePatch({
+                currentOverrides,
+                rowId,
+                columnId: column.id,
+                existingClientValue,
+                eventId,
+            }));
             throw error;
         }
 
         if (!eventId) {
             eventRecord[EVENT_METADATA_KEYS.eventId] = targetEventId;
+            eventRecord[EVENT_METADATA_KEYS.occurredAt] = nextOccurredAt;
         }
     }, [isMembersFormPage, saveEventMutation, selectedMembersVisitDate]);
 

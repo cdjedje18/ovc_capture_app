@@ -23,6 +23,7 @@ import { determineLinkedEntity } from
 const RECORD_META_KEYS = {
     programStageId: '__programStageId',
     eventId: '__eventId',
+    occurredAt: '__occurredAt',
 } as const;
 
 type MembersRelationshipParams = {
@@ -208,6 +209,7 @@ const mergeEventValuesIntoTeis = ({
             ...tei.record,
             [RECORD_META_KEYS.programStageId]: programStageId,
             [RECORD_META_KEYS.eventId]: event?.event,
+            [RECORD_META_KEYS.occurredAt]: event?.occurredAt,
         };
         if (!event || !additionalColumns.length) {
             return {
