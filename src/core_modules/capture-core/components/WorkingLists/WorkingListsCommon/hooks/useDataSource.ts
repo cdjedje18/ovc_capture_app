@@ -11,6 +11,7 @@ import { generateUID } from '../../../../utils/uid/generateUID';
 import { buildUrlQueryString } from '../../../../utils/routing';
 import { isMembersFormPage as isMembersFormPageRoute } from '../../utils/isMembersFormPage';
 import {
+    useDefaultMembersVisitDate,
     useSelectedMembersVisitDate,
 } from '../../WorkingListsBase/membersVisitDate.store';
 import { InlineEventCellField } from './InlineEventCellField.component';
@@ -249,7 +250,9 @@ export const useDataSource = (
 ) => {
     const isMembersFormPage = isMembersFormPageRoute();
     const selectedMembersVisitDate = useSelectedMembersVisitDate();
-    const isMembersFormLocked = isMembersFormPage && !selectedMembersVisitDate;
+    const defaultMembersVisitDate = useDefaultMembersVisitDate();
+    const effectiveMembersVisitDate = selectedMembersVisitDate || defaultMembersVisitDate;
+    const isMembersFormLocked = isMembersFormPage && !effectiveMembersVisitDate;
     const { baseUrl } = useConfig();
     const {
         refetch: refetchSelectedDateEvents,
@@ -259,7 +262,7 @@ export const useDataSource = (
     const [recordOverrides, setRecordOverrides] = useState<{ [key: string]: { [key: string]: any } }>({});
     const activeOverrideScopeKey = getOverrideScopeKey({
         isMembersFormPage,
-        selectedMembersVisitDate,
+        selectedMembersVisitDate: effectiveMembersVisitDate,
     });
     const fetchedSelectedDateEventsByTei = useMemo(() => {
         const selectedDateEventsResults = selectedDateEventsData?.results as any;
@@ -267,17 +270,17 @@ export const useDataSource = (
         return getLatestEventByTrackedEntity(events);
     }, [selectedDateEventsData]);
     const selectedDateEventsByTei = useMemo(() => {
-        if (!isMembersFormPage || !selectedMembersVisitDate) {
+        if (!isMembersFormPage || !effectiveMembersVisitDate) {
             return undefined;
         }
 
         return fetchedSelectedDateEventsByTei;
-    }, [fetchedSelectedDateEventsByTei, isMembersFormPage, selectedMembersVisitDate]);
+    }, [effectiveMembersVisitDate, fetchedSelectedDateEventsByTei, isMembersFormPage]);
     const eventRecordsArray = useMemo(() =>
         recordsOrder && records && recordsOrder
             .map(id => ({
                 ...records[id],
-                ...(isMembersFormPage && selectedMembersVisitDate && selectedDateEventsByTei ? (() => {
+                ...(isMembersFormPage && effectiveMembersVisitDate && selectedDateEventsByTei ? (() => {
                     const selectedDateEvent = selectedDateEventsByTei[records[id]?.[EVENT_METADATA_KEYS.teiId] || id];
                     const selectedDateEventValues = (selectedDateEvent?.dataValues || []).reduce((acc, dataValue) => {
                         acc[dataValue.dataElement] = dataValue.value;
@@ -307,13 +310,13 @@ export const useDataSource = (
         recordOverrides,
         activeOverrideScopeKey,
         isMembersFormPage,
-        selectedMembersVisitDate,
+        effectiveMembersVisitDate,
         selectedDateEventsByTei,
         columns,
     ]);
 
     React.useEffect(() => {
-        if (!isMembersFormPage || !selectedMembersVisitDate || !recordsOrder?.length || !records) {
+        if (!isMembersFormPage || !effectiveMembersVisitDate || !recordsOrder?.length || !records) {
             return;
         }
 
@@ -332,11 +335,11 @@ export const useDataSource = (
             programId,
             programStageId,
             trackedEntityIds: getJoinedTeiIds(trackedEntityIds),
-            selectedDate: selectedMembersVisitDate,
+            selectedDate: effectiveMembersVisitDate,
         });
     }, [
         isMembersFormPage,
-        selectedMembersVisitDate,
+        effectiveMembersVisitDate,
         records,
         recordsOrder,
         refetchSelectedDateEvents,
@@ -355,7 +358,7 @@ export const useDataSource = (
         if (existingClientValue === nextClientValue) {
             return;
         }
-        if (isMembersFormPage && !selectedMembersVisitDate) {
+        if (isMembersFormPage && !effectiveMembersVisitDate) {
             return;
         }
 
@@ -371,14 +374,14 @@ export const useDataSource = (
         } = getEventMetadata(eventRecord);
         const shouldReuseExistingEvent = Boolean(eventId) && hasEventForSelectedDate({
             isMembersFormPage,
-            selectedMembersVisitDate,
+            selectedMembersVisitDate: effectiveMembersVisitDate,
             occurredAt: existingOccurredAt,
         });
         const targetExistingEventId = shouldReuseExistingEvent ? eventId : undefined;
         const targetExistingOccurredAt = shouldReuseExistingEvent ? existingOccurredAt : undefined;
         const overrideScopeKey = getOverrideScopeKey({
             isMembersFormPage,
-            selectedMembersVisitDate,
+            selectedMembersVisitDate: effectiveMembersVisitDate,
             existingOccurredAt: targetExistingOccurredAt,
         });
 
@@ -403,7 +406,7 @@ export const useDataSource = (
         const nextOccurredAt = getOccurredAtForSave({
             eventId: targetExistingEventId,
             existingOccurredAt: targetExistingOccurredAt,
-            selectedMembersVisitDate,
+            selectedMembersVisitDate: effectiveMembersVisitDate,
         });
         const rowId = eventRecord.id;
 
@@ -464,7 +467,7 @@ export const useDataSource = (
             eventRecord[EVENT_METADATA_KEYS.occurredAt] = nextOccurredAt;
             eventRecord[EVENT_METADATA_KEYS.syntheticForSelectedDate] = true;
         }
-    }, [isMembersFormPage, saveEventMutation, selectedMembersVisitDate]);
+    }, [effectiveMembersVisitDate, isMembersFormPage, saveEventMutation]);
 
     return useMemo(() => eventRecordsArray && eventRecordsArray
         .map((eventRecord) => {
@@ -475,7 +478,7 @@ export const useDataSource = (
                     const { id, type, options, resolveValue } = column;
                     const isSelectedDateMatch = hasEventForSelectedDate({
                         isMembersFormPage,
-                        selectedMembersVisitDate,
+                        selectedMembersVisitDate: effectiveMembersVisitDate,
                         occurredAt: eventRecord[EVENT_METADATA_KEYS.occurredAt],
                     });
                     const isSyntheticEventForSelectedDate = Boolean(eventRecord[EVENT_METADATA_KEYS.syntheticForSelectedDate]);
@@ -569,6 +572,7 @@ export const useDataSource = (
         eventRecordsArray,
         columns,
         baseUrl,
+        effectiveMembersVisitDate,
         isMembersFormPage,
         isMembersFormLocked,
         persistEventCellValue,

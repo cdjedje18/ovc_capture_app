@@ -24,6 +24,7 @@ import { useLocationQuery } from 'capture-core/utils/routing';
 import { OptionLabel } from '../../../ScopeSelector/OptionLabel';
 import {
     useAvailableMembersVisitDates,
+    setDefaultMembersVisitDate,
     setSelectedMembersVisitDate,
     useSelectedMembersVisitDate,
 } from '../../../WorkingLists/WorkingListsBase/membersVisitDate.store';
@@ -143,6 +144,7 @@ export const TopBar = ({ sourceProgramId, entryProgramId, orgUnitId, selectedCat
     useEffect(() => {
         setCachedEventDates([]);
         hasAppliedDefaultEventDateRef.current = false;
+        setDefaultMembersVisitDate(undefined);
     }, [masterTEI, entryProgramId]);
 
     useEffect(() => {
@@ -150,7 +152,7 @@ export const TopBar = ({ sourceProgramId, entryProgramId, orgUnitId, selectedCat
             return;
         }
 
-        setSelectedMembersVisitDate(eventDateOptions[0].value);
+        setDefaultMembersVisitDate(eventDateOptions[0].value);
         hasAppliedDefaultEventDateRef.current = true;
     }, [eventDateOptions, selectedMembersVisitDate]);
 
