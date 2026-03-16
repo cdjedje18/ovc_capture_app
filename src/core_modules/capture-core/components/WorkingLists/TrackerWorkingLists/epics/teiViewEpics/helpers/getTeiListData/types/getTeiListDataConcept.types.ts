@@ -13,6 +13,12 @@ export type ApiTei = {
         orgUnit: string,
         program?: string,
         status?: string,
+        events?: Array<{
+            event: string,
+            occurredAt?: string,
+            program?: string,
+            programStage?: string,
+        }>,
     }>,
     programOwners: Array<{
         orgUnit: string,

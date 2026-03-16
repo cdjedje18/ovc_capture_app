@@ -1,18 +1,21 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import moment from 'moment';
-import { useConfig, useDataMutation } from '@dhis2/app-runtime';
+import { useConfig, useDataMutation, useDataQuery } from '@dhis2/app-runtime';
 import { Button } from '@dhis2/ui';
 import log from 'loglevel';
-import { errorCreator } from 'capture-core-utils';
+import { errorCreator, FEATURES, featureAvailable } from 'capture-core-utils';
 import type { Mutation } from 'capture-core-utils/types/app-runtime';
 import { dataElementTypes, DataElement, OptionSet, Option } from '../../../../metaData';
-import { convertClientToList, convertClientToServer } from '../../../../converters';
+import { convertClientToList, convertClientToServer, convertServerToClient } from '../../../../converters';
 import { generateUID } from '../../../../utils/uid/generateUID';
 import { buildUrlQueryString } from '../../../../utils/routing';
 import { isMembersFormPage as isMembersFormPageRoute } from '../../utils/isMembersFormPage';
-import { useSelectedMembersVisitDate } from '../../WorkingListsBase/membersVisitDate.store';
+import {
+    useSelectedMembersVisitDate,
+} from '../../WorkingListsBase/membersVisitDate.store';
 import { InlineEventCellField } from './InlineEventCellField.component';
 import { MEMBERS_CAPTURE_LINK_COLUMN_ID } from '../../TrackerWorkingLists/Setup/hooks/useDefaultColumnConfig';
+import { getFilterApiName } from '../../TrackerWorkingLists/helpers';
 
 const TRACKER_EVENT_MUTATION: Mutation = {
     resource: 'tracker?async=false&importStrategy=CREATE_AND_UPDATE',
@@ -28,7 +31,40 @@ const EVENT_METADATA_KEYS = {
     programId: '__programId',
     programStageId: '__programStageId',
     occurredAt: '__occurredAt',
+    syntheticForSelectedDate: '__syntheticForSelectedDate',
 } as const;
+
+const SELECTED_DATE_EVENTS_QUERY: any = {
+    results: {
+        resource: 'tracker/events',
+        params: ({ programId, programStageId, trackedEntityIds, selectedDate }) => ({
+            program: programId,
+            programStage: programStageId,
+            pageSize: 10000,
+            order: 'occurredAt:desc',
+            [featureAvailable(FEATURES.newEntityFilterQueryParam) ? 'trackedEntities' : 'trackedEntity']: trackedEntityIds,
+            occurredAfter: selectedDate,
+            occurredBefore: selectedDate,
+            fields: 'event,trackedEntity,status,occurredAt,scheduledAt,orgUnit,assignedUser,dataValues[dataElement,value]',
+        }),
+    },
+};
+
+const getOccurredAtDate = (occurredAt?: string) => occurredAt?.slice(0, 10);
+const DEFAULT_OVERRIDE_SCOPE = '__default';
+const getJoinedTeiIds = (teiIds: Array<string>) => teiIds.join(featureAvailable(FEATURES.newUIDsSeparator) ? ',' : ';');
+
+const hasEventForSelectedDate = ({
+    isMembersFormPage,
+    selectedMembersVisitDate,
+    occurredAt,
+}: {
+    isMembersFormPage: boolean,
+    selectedMembersVisitDate?: string,
+    occurredAt?: string,
+}) => !isMembersFormPage
+    || !selectedMembersVisitDate
+    || getOccurredAtDate(occurredAt) === selectedMembersVisitDate;
 
 const getEventMetadata = (eventRecord: { [key: string]: any }) => ({
     eventId: eventRecord[EVENT_METADATA_KEYS.eventId],
@@ -38,6 +74,7 @@ const getEventMetadata = (eventRecord: { [key: string]: any }) => ({
     programId: eventRecord[EVENT_METADATA_KEYS.programId],
     programStageId: eventRecord[EVENT_METADATA_KEYS.programStageId],
     occurredAt: eventRecord[EVENT_METADATA_KEYS.occurredAt],
+    syntheticForSelectedDate: eventRecord[EVENT_METADATA_KEYS.syntheticForSelectedDate],
 });
 
 const getCaptureEnrollmentUrl = ({
@@ -91,31 +128,38 @@ const getOccurredAtForSave = ({
 }) => (eventId ? existingOccurredAt : getOccurredAtWithCurrentTime(selectedMembersVisitDate));
 
 const applyRecordOverridePatch = (
-    currentOverrides: { [key: string]: any },
+    currentOverrides: { [key: string]: { [key: string]: any } },
+    scopeKey: string,
     rowId: string,
     patch: { [key: string]: any },
 ) => ({
     ...currentOverrides,
-    [rowId]: {
-        ...(currentOverrides[rowId] || {}),
-        ...patch,
+    [scopeKey]: {
+        ...(currentOverrides[scopeKey] || {}),
+        [rowId]: {
+            ...((currentOverrides[scopeKey] || {})[rowId] || {}),
+            ...patch,
+        },
     },
 });
 
 const revertRecordOverridePatch = ({
     currentOverrides,
+    scopeKey,
     rowId,
     columnId,
     existingClientValue,
     eventId,
 }: {
-    currentOverrides: { [key: string]: any },
+    currentOverrides: { [key: string]: { [key: string]: any } },
+    scopeKey: string,
     rowId: string,
     columnId: string,
     existingClientValue: any,
     eventId?: string,
 }) => {
-    const currentRowOverrides = currentOverrides[rowId] || {};
+    const scopedOverrides = currentOverrides[scopeKey] || {};
+    const currentRowOverrides = scopedOverrides[rowId] || {};
     const nextRowOverrides = {
         ...currentRowOverrides,
         [columnId]: existingClientValue,
@@ -124,13 +168,54 @@ const revertRecordOverridePatch = ({
     if (!eventId) {
         delete nextRowOverrides[EVENT_METADATA_KEYS.eventId];
         delete nextRowOverrides[EVENT_METADATA_KEYS.occurredAt];
+        delete nextRowOverrides[EVENT_METADATA_KEYS.syntheticForSelectedDate];
     }
 
     return {
         ...currentOverrides,
-        [rowId]: nextRowOverrides,
+        [scopeKey]: {
+            ...scopedOverrides,
+            [rowId]: nextRowOverrides,
+        },
     };
 };
+
+const getOverrideScopeKey = ({
+    isMembersFormPage,
+    selectedMembersVisitDate,
+    existingOccurredAt,
+}: {
+    isMembersFormPage: boolean,
+    selectedMembersVisitDate?: string,
+    existingOccurredAt?: string,
+}) => {
+    if (!isMembersFormPage) {
+        return DEFAULT_OVERRIDE_SCOPE;
+    }
+
+    return selectedMembersVisitDate || getOccurredAtDate(existingOccurredAt) || DEFAULT_OVERRIDE_SCOPE;
+};
+
+const getLatestEventByTrackedEntity = (events: Array<any>) =>
+    events.reduce((acc, event) => {
+        const trackedEntityId = event.trackedEntity;
+        if (!trackedEntityId) {
+            return acc;
+        }
+
+        const currentSelected = acc[trackedEntityId];
+        if (!currentSelected) {
+            acc[trackedEntityId] = event;
+            return acc;
+        }
+
+        const currentDate = event.occurredAt || event.scheduledAt || '';
+        const selectedDate = currentSelected.occurredAt || currentSelected.scheduledAt || '';
+        if (currentDate > selectedDate) {
+            acc[trackedEntityId] = event;
+        }
+        return acc;
+    }, {});
 
 const createDataElement = (column) => {
     const dataElement = new DataElement((o) => {
@@ -166,18 +251,95 @@ export const useDataSource = (
     const selectedMembersVisitDate = useSelectedMembersVisitDate();
     const isMembersFormLocked = isMembersFormPage && !selectedMembersVisitDate;
     const { baseUrl } = useConfig();
+    const {
+        refetch: refetchSelectedDateEvents,
+        data: selectedDateEventsData,
+    } = useDataQuery(SELECTED_DATE_EVENTS_QUERY, { lazy: true });
     const [saveEventMutation] = useDataMutation(TRACKER_EVENT_MUTATION);
-    const [recordOverrides, setRecordOverrides] = useState<{ [key: string]: any }>({});
+    const [recordOverrides, setRecordOverrides] = useState<{ [key: string]: { [key: string]: any } }>({});
+    const activeOverrideScopeKey = getOverrideScopeKey({
+        isMembersFormPage,
+        selectedMembersVisitDate,
+    });
+    const fetchedSelectedDateEventsByTei = useMemo(() => {
+        const selectedDateEventsResults = selectedDateEventsData?.results as any;
+        const events = selectedDateEventsResults?.events || selectedDateEventsResults?.instances || [];
+        return getLatestEventByTrackedEntity(events);
+    }, [selectedDateEventsData]);
+    const selectedDateEventsByTei = useMemo(() => {
+        if (!isMembersFormPage || !selectedMembersVisitDate) {
+            return undefined;
+        }
+
+        return fetchedSelectedDateEventsByTei;
+    }, [fetchedSelectedDateEventsByTei, isMembersFormPage, selectedMembersVisitDate]);
     const eventRecordsArray = useMemo(() =>
         recordsOrder && records && recordsOrder
             .map(id => ({
                 ...records[id],
-                ...(recordOverrides[id] || {}),
+                ...(isMembersFormPage && selectedMembersVisitDate && selectedDateEventsByTei ? (() => {
+                    const selectedDateEvent = selectedDateEventsByTei[records[id]?.[EVENT_METADATA_KEYS.teiId] || id];
+                    const selectedDateEventValues = (selectedDateEvent?.dataValues || []).reduce((acc, dataValue) => {
+                        acc[dataValue.dataElement] = dataValue.value;
+                        return acc;
+                    }, {});
+
+                    return columns
+                        .filter(column => column.additionalColumn)
+                        .reduce((acc, column) => {
+                            const rawValue = column.mainProperty
+                                ? selectedDateEvent?.[getFilterApiName(column.id)]
+                                : selectedDateEventValues[column.id];
+
+                            acc[column.id] = rawValue == null ? undefined : convertServerToClient(rawValue, column.type);
+                            return acc;
+                        }, {
+                            [EVENT_METADATA_KEYS.eventId]: selectedDateEvent?.event,
+                            [EVENT_METADATA_KEYS.occurredAt]: selectedDateEvent?.occurredAt,
+                            [EVENT_METADATA_KEYS.syntheticForSelectedDate]: false,
+                        });
+                })() : {}),
+                ...((recordOverrides[activeOverrideScopeKey] || {})[id] || {}),
                 id,
             })), [
         records,
         recordsOrder,
         recordOverrides,
+        activeOverrideScopeKey,
+        isMembersFormPage,
+        selectedMembersVisitDate,
+        selectedDateEventsByTei,
+        columns,
+    ]);
+
+    React.useEffect(() => {
+        if (!isMembersFormPage || !selectedMembersVisitDate || !recordsOrder?.length || !records) {
+            return;
+        }
+
+        const firstRecord = records[recordsOrder[0]];
+        const programId = firstRecord?.[EVENT_METADATA_KEYS.programId];
+        const programStageId = firstRecord?.[EVENT_METADATA_KEYS.programStageId];
+        const trackedEntityIds = recordsOrder
+            .map(id => records[id]?.[EVENT_METADATA_KEYS.teiId] || id)
+            .filter(Boolean);
+
+        if (!programId || !programStageId || !trackedEntityIds.length) {
+            return;
+        }
+
+        refetchSelectedDateEvents({
+            programId,
+            programStageId,
+            trackedEntityIds: getJoinedTeiIds(trackedEntityIds),
+            selectedDate: selectedMembersVisitDate,
+        });
+    }, [
+        isMembersFormPage,
+        selectedMembersVisitDate,
+        records,
+        recordsOrder,
+        refetchSelectedDateEvents,
     ]);
 
     const persistEventCellValue = useCallback(async ({
@@ -205,7 +367,20 @@ export const useDataSource = (
             programId,
             programStageId,
             occurredAt: existingOccurredAt,
+            syntheticForSelectedDate,
         } = getEventMetadata(eventRecord);
+        const shouldReuseExistingEvent = !syntheticForSelectedDate && hasEventForSelectedDate({
+            isMembersFormPage,
+            selectedMembersVisitDate,
+            occurredAt: existingOccurredAt,
+        });
+        const targetExistingEventId = shouldReuseExistingEvent ? eventId : undefined;
+        const targetExistingOccurredAt = shouldReuseExistingEvent ? existingOccurredAt : undefined;
+        const overrideScopeKey = getOverrideScopeKey({
+            isMembersFormPage,
+            selectedMembersVisitDate,
+            existingOccurredAt: targetExistingOccurredAt,
+        });
 
         if (!teiId || !enrollmentId || !orgUnitId || !programId || !programStageId) {
             log.warn(
@@ -224,18 +399,18 @@ export const useDataSource = (
         const serverValue = nextClientValue === ''
             ? ''
             : convertClientToServer(nextClientValue, column.type);
-        const targetEventId = eventId || generateUID();
+        const targetEventId = targetExistingEventId || generateUID();
         const nextOccurredAt = getOccurredAtForSave({
-            eventId,
-            existingOccurredAt,
+            eventId: targetExistingEventId,
+            existingOccurredAt: targetExistingOccurredAt,
             selectedMembersVisitDate,
         });
         const rowId = eventRecord.id;
 
-        if (eventId && !nextOccurredAt) {
+        if (targetExistingEventId && !nextOccurredAt) {
             log.warn(
                 errorCreator('Could not save existing event because occurredAt is missing')({
-                    eventId,
+                    eventId: targetExistingEventId,
                     columnId: column.id,
                     rowId,
                 }),
@@ -245,13 +420,15 @@ export const useDataSource = (
 
         const overridePatch = {
             [column.id]: nextClientValue,
-            ...(!eventId ? {
+            ...(!targetExistingEventId ? {
                 [EVENT_METADATA_KEYS.eventId]: targetEventId,
                 [EVENT_METADATA_KEYS.occurredAt]: nextOccurredAt,
+                [EVENT_METADATA_KEYS.syntheticForSelectedDate]: true,
             } : {}),
         };
 
-        setRecordOverrides(currentOverrides => applyRecordOverridePatch(currentOverrides, rowId, overridePatch));
+        setRecordOverrides(currentOverrides =>
+            applyRecordOverridePatch(currentOverrides, overrideScopeKey, rowId, overridePatch));
 
         try {
             await saveEventMutation({
@@ -273,27 +450,42 @@ export const useDataSource = (
         } catch (error) {
             setRecordOverrides(currentOverrides => revertRecordOverridePatch({
                 currentOverrides,
+                scopeKey: overrideScopeKey,
                 rowId,
                 columnId: column.id,
                 existingClientValue,
-                eventId,
+                eventId: targetExistingEventId,
             }));
             throw error;
         }
 
-        if (!eventId) {
+        if (!targetExistingEventId) {
             eventRecord[EVENT_METADATA_KEYS.eventId] = targetEventId;
             eventRecord[EVENT_METADATA_KEYS.occurredAt] = nextOccurredAt;
+            eventRecord[EVENT_METADATA_KEYS.syntheticForSelectedDate] = true;
         }
     }, [isMembersFormPage, saveEventMutation, selectedMembersVisitDate]);
 
     return useMemo(() => eventRecordsArray && eventRecordsArray
         .map((eventRecord) => {
+            const activeRowOverride = ((recordOverrides[activeOverrideScopeKey] || {})[eventRecord.id] || {});
             const listRecord = columns
                 .filter(column => column.visible)
                 .reduce((acc, column) => {
                     const { id, type, options, resolveValue } = column;
-                    const clientValue = eventRecord[id];
+                    const isSelectedDateMatch = hasEventForSelectedDate({
+                        isMembersFormPage,
+                        selectedMembersVisitDate,
+                        occurredAt: eventRecord[EVENT_METADATA_KEYS.occurredAt],
+                    });
+                    const isSyntheticEventForSelectedDate = Boolean(eventRecord[EVENT_METADATA_KEYS.syntheticForSelectedDate]);
+                    const shouldBlankEventValue = isMembersFormPage
+                        && (
+                            !isSelectedDateMatch
+                            || (isSyntheticEventForSelectedDate && activeRowOverride[id] === undefined)
+                        )
+                        && (column.additionalColumn || column.mainProperty);
+                    const clientValue = shouldBlankEventValue ? undefined : eventRecord[id];
                     if (isMembersFormPage && id === MEMBERS_CAPTURE_LINK_COLUMN_ID) {
                         const captureEnrollmentUrl = getCaptureEnrollmentUrl({
                             baseUrl,

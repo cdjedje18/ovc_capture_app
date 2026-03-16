@@ -17,6 +17,7 @@ import type { InputMeta } from './getTeiListData.types';
 import type { TeiColumnsMetaForDataFetching, TeiFiltersOnlyMetaForDataFetching } from '../../../../types';
 import { isMembersFormPage as isMembersFormPageRoute } from '../../../../../utils/isMembersFormPage';
 import { getLocationQuery } from '../../../../../../../utils/routing';
+import { setAvailableMembersVisitDates } from '../../../../../WorkingListsBase/membersVisitDate.store';
 import { determineLinkedEntity } from
     '../../../../../../WidgetsRelationship/common/RelationshipsWidget/useGroupedLinkedEntities';
 
@@ -109,6 +110,18 @@ const getMembersFamilyTeiIds = async (
     });
 };
 
+const getAvailableEventDatesFromTeis = (
+    apiTrackedEntities: Array<any>,
+    programId?: string,
+    programStageId?: string,
+) => apiTrackedEntities
+    .flatMap(tei => (tei.enrollments || [])
+        .filter(enrollment => !programId || enrollment.program === programId)
+        .flatMap(enrollment => (enrollment.events || [])
+            .filter(event => (!programId || event.program === programId) && (!programStageId || event.programStage === programStageId))
+            .map(event => event.occurredAt?.slice(0, 10))
+            .filter(Boolean)));
+
 export const createApiQueryArgs = ({
     page,
     pageSize,
@@ -142,7 +155,9 @@ trackedEntityIds?: Array<string>,
         ...(trackedEntityIds?.length
             ? { [getTrackedEntitiesQueryParam()]: getJoinedTeiIds(trackedEntityIds) }
             : {}),
-        fields: ':all,!relationships,programOwners[orgUnit,program]',
+        fields: isMembersFormPageRoute()
+            ? ':all,!relationships,programOwners[orgUnit,program],enrollments[enrollment,orgUnit,program,status,events[event,occurredAt,program,programStage]]'
+            : ':all,!relationships,programOwners[orgUnit,program]',
     };
 };
 
@@ -295,6 +310,13 @@ export const getTeiListData = async (
 
     const apiResponse = await querySingleResource({ resource: url, params: queryParams });
     const apiTrackedEntities = handleAPIResponse(REQUESTED_ENTITIES.trackedEntities, apiResponse);
+    if (isMembersFormPageRoute()) {
+        setAvailableMembersVisitDates(getAvailableEventDatesFromTeis(
+            apiTrackedEntities,
+            rawQueryArgs.programId,
+            rawQueryArgs.programStageId,
+        ));
+    }
     const columnsMetaForDataFetchingArray = [...columnsMetaForDataFetching.values()];
     const clientTeis = convertToClientTeis(apiTrackedEntities, columnsMetaForDataFetchingArray, rawQueryArgs.programId);
 

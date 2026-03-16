@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react';
 
 let state: string | undefined;
+let availableDates: Array<string> = [];
 const listeners = new Set<() => void>();
 
 const emit = () => {
@@ -23,10 +24,30 @@ export const setSelectedMembersVisitDate = (date: string | undefined) => {
     emit();
 };
 
+export const setAvailableMembersVisitDates = (dates: Array<string>) => {
+    const uniqueSortedDates = Array.from(new Set(dates.filter(Boolean))).sort((a, b) => b.localeCompare(a));
+    const didChange = availableDates.length !== uniqueSortedDates.length
+        || availableDates.some((date, index) => date !== uniqueSortedDates[index]);
+
+    if (!didChange) {
+        return;
+    }
+
+    availableDates = uniqueSortedDates;
+    emit();
+};
+
 export const useSelectedMembersVisitDate = () =>
     useSyncExternalStore(
         subscribe,
         () => state,
         () => undefined,
+    );
+
+export const useAvailableMembersVisitDates = () =>
+    useSyncExternalStore(
+        subscribe,
+        () => availableDates,
+        () => [],
     );
 
