@@ -5,8 +5,8 @@ msgstr ""
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1)\n"
-"POT-Creation-Date: 2026-03-09T16:50:13.688Z\n"
-"PO-Revision-Date: 2026-03-09T16:50:13.689Z\n"
+"POT-Creation-Date: 2026-03-16T13:03:12.291Z\n"
+"PO-Revision-Date: 2026-03-16T13:03:12.292Z\n"
 
 msgid "The application could not be loaded."
 msgstr "The application could not be loaded."
@@ -1894,6 +1894,9 @@ msgstr "Registration Date"
 
 msgid "Inactive"
 msgstr "Inactive"
+
+msgid "Capture App"
+msgstr "Capture App"
 
 msgid "Follow up"
 msgstr "Follow up"

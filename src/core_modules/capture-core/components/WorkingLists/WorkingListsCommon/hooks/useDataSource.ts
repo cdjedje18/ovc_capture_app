@@ -369,7 +369,7 @@ export const useDataSource = (
             occurredAt: existingOccurredAt,
             syntheticForSelectedDate,
         } = getEventMetadata(eventRecord);
-        const shouldReuseExistingEvent = !syntheticForSelectedDate && hasEventForSelectedDate({
+        const shouldReuseExistingEvent = Boolean(eventId) && hasEventForSelectedDate({
             isMembersFormPage,
             selectedMembersVisitDate,
             occurredAt: existingOccurredAt,
