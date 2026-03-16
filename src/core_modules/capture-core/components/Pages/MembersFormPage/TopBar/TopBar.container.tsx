@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDataQuery } from '@dhis2/app-runtime';
 // @ts-expect-error - SelectorBarItem is available at runtime, but its TypeScript definition is not exposed by the UI library
 import { SelectorBarItem } from '@dhis2/ui';
@@ -63,6 +63,7 @@ export const TopBar = ({ sourceProgramId, entryProgramId, orgUnitId, selectedCat
     const availableMembersVisitDates = useAvailableMembersVisitDates();
     const selectedMembersVisitDate = useSelectedMembersVisitDate();
     const [cachedEventDates, setCachedEventDates] = useState<string[]>([]);
+    const hasAppliedDefaultEventDateRef = useRef(false);
     const { records, recordsOrder } = useSelector(({
         workingListsListRecords,
         workingLists,
@@ -141,7 +142,17 @@ export const TopBar = ({ sourceProgramId, entryProgramId, orgUnitId, selectedCat
 
     useEffect(() => {
         setCachedEventDates([]);
+        hasAppliedDefaultEventDateRef.current = false;
     }, [masterTEI, entryProgramId]);
+
+    useEffect(() => {
+        if (hasAppliedDefaultEventDateRef.current || selectedMembersVisitDate || !eventDateOptions.length) {
+            return;
+        }
+
+        setSelectedMembersVisitDate(eventDateOptions[0].value);
+        hasAppliedDefaultEventDateRef.current = true;
+    }, [eventDateOptions, selectedMembersVisitDate]);
 
     return (
         <ScopeSelector
