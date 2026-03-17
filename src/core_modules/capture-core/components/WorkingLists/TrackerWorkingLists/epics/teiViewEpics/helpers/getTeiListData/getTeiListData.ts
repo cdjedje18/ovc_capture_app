@@ -322,7 +322,7 @@ export const getTeiListData = async (
 
     let enrichedClientTeis = clientTeis;
     const { programStageId } = rawQueryArgs;
-    if (programStageId && clientTeis.length > 0) {
+    if (programStageId && clientTeis.length > 0 && !isMembersFormPageRoute()) {
         const useNewSeparator = featureAvailable(FEATURES.newUIDsSeparator);
         const trackedEntityIds = clientTeis
             .map(({ id }) => id)

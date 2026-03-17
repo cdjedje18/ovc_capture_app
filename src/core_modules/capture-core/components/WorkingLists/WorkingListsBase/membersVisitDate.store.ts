@@ -2,7 +2,6 @@ import { useSyncExternalStore } from 'react';
 
 let state: string | undefined;
 let availableDates: Array<string> = [];
-let defaultDate: string | undefined;
 const listeners = new Set<() => void>();
 
 const emit = () => {
@@ -38,15 +37,6 @@ export const setAvailableMembersVisitDates = (dates: Array<string>) => {
     emit();
 };
 
-export const setDefaultMembersVisitDate = (date: string | undefined) => {
-    if (defaultDate === date) {
-        return;
-    }
-
-    defaultDate = date;
-    emit();
-};
-
 export const useSelectedMembersVisitDate = () =>
     useSyncExternalStore(
         subscribe,
@@ -59,12 +49,5 @@ export const useAvailableMembersVisitDates = () =>
         subscribe,
         () => availableDates,
         () => [],
-    );
-
-export const useDefaultMembersVisitDate = () =>
-    useSyncExternalStore(
-        subscribe,
-        () => defaultDate,
-        () => undefined,
     );
 
