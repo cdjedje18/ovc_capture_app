@@ -11,6 +11,7 @@ import { generateUID } from '../../../../utils/uid/generateUID';
 import { buildUrlQueryString } from '../../../../utils/routing';
 import { isMembersFormPage as isMembersFormPageRoute } from '../../utils/isMembersFormPage';
 import {
+    setLoadingSelectedDateEvents,
     useSelectedMembersVisitDate,
 } from '../../WorkingListsBase/membersVisitDate.store';
 import { InlineEventCellField } from './InlineEventCellField.component';
@@ -254,6 +255,7 @@ export const useDataSource = (
     const {
         refetch: refetchSelectedDateEvents,
         data: selectedDateEventsData,
+        loading: selectedDateEventsLoading,
     } = useDataQuery(SELECTED_DATE_EVENTS_QUERY, { lazy: true });
     const [saveEventMutation] = useDataMutation(TRACKER_EVENT_MUTATION);
     const [recordOverrides, setRecordOverrides] = useState<{ [key: string]: { [key: string]: any } }>({});
@@ -311,6 +313,19 @@ export const useDataSource = (
         selectedDateEventsByTei,
         columns,
     ]);
+
+    React.useEffect(() => {
+        if (!isMembersFormPage) {
+            setLoadingSelectedDateEvents(false);
+            return undefined;
+        }
+
+        setLoadingSelectedDateEvents(Boolean(selectedMembersVisitDate && selectedDateEventsLoading));
+
+        return () => {
+            setLoadingSelectedDateEvents(false);
+        };
+    }, [isMembersFormPage, selectedDateEventsLoading, selectedMembersVisitDate]);
 
     React.useEffect(() => {
         if (!isMembersFormPage || !selectedMembersVisitDate || !recordsOrder?.length || !records) {

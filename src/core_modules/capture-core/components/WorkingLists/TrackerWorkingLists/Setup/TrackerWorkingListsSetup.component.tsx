@@ -3,6 +3,7 @@ import type { Props } from './trackerWorkingListsSetup.types';
 import { WorkingListsBase } from '../../WorkingListsBase';
 import { useMainViewConfig } from 'capture-core/components/Pages/MembersFormPage/MembersFormPageBody/WorkingListsType/EventWorkingListsInit/InitOnline/useMainViewConfig';
 import { useSelectedMembersSection, setSelectedMembersSection } from '../../WorkingListsBase/membersSectionSelection.store';
+import { useLoadingSelectedDateEvents } from '../../WorkingListsBase/membersVisitDate.store';
 import {
     useDefaultColumnConfig,
     useFiltersOnly,
@@ -69,6 +70,7 @@ export const TrackerWorkingListsSetup = ({
 }: Props) => {
     const isMembersFormPage = isMembersFormPageRoute();
     const { dataEntryPrograms } = useMainViewConfig();
+    const loadingSelectedDateEvents = useLoadingSelectedDateEvents();
     const dataEntryProgramStageId = useMemo(() => {
         const selectedDataEntryProgram =
             dataEntryPrograms?.find(entry => entry.program === program.id) ?? dataEntryPrograms?.[0];
@@ -289,6 +291,7 @@ export const TrackerWorkingListsSetup = ({
             filters={filters}
             sortById={sortById}
             sortByDirection={sortByDirection}
+            updating={passOnProps.updating || loadingSelectedDateEvents}
             bulkActionBarComponent={bulkActionBarComponent}
             onClickListRow={isMembersFormPage ? onRowClickNoop : passOnProps.onClickListRow}
         />

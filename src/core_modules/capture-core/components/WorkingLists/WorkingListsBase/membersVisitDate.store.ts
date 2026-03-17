@@ -2,6 +2,7 @@ import { useSyncExternalStore } from 'react';
 
 let state: string | undefined;
 let availableDates: Array<string> = [];
+let loadingSelectedDateEvents = false;
 const listeners = new Set<() => void>();
 
 const emit = () => {
@@ -37,6 +38,15 @@ export const setAvailableMembersVisitDates = (dates: Array<string>) => {
     emit();
 };
 
+export const setLoadingSelectedDateEvents = (loading: boolean) => {
+    if (loadingSelectedDateEvents === loading) {
+        return;
+    }
+
+    loadingSelectedDateEvents = loading;
+    emit();
+};
+
 export const useSelectedMembersVisitDate = () =>
     useSyncExternalStore(
         subscribe,
@@ -49,5 +59,12 @@ export const useAvailableMembersVisitDates = () =>
         subscribe,
         () => availableDates,
         () => [],
+    );
+
+export const useLoadingSelectedDateEvents = () =>
+    useSyncExternalStore(
+        subscribe,
+        () => loadingSelectedDateEvents,
+        () => false,
     );
 
