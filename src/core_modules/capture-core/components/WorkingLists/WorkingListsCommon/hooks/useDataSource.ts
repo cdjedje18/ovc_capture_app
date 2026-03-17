@@ -247,6 +247,7 @@ export const useDataSource = (
         visible: boolean,
         [key: string]: any,
     }>,
+    currentProgramStageId?: string,
 ) => {
     const isMembersFormPage = isMembersFormPageRoute();
     const selectedMembersVisitDate = useSelectedMembersVisitDate();
@@ -334,7 +335,7 @@ export const useDataSource = (
 
         const firstRecord = records[recordsOrder[0]];
         const programId = firstRecord?.[EVENT_METADATA_KEYS.programId];
-        const programStageId = firstRecord?.[EVENT_METADATA_KEYS.programStageId];
+        const programStageId = currentProgramStageId || firstRecord?.[EVENT_METADATA_KEYS.programStageId];
         const trackedEntityIds = recordsOrder
             .map(id => records[id]?.[EVENT_METADATA_KEYS.teiId] || id)
             .filter(Boolean);
@@ -355,6 +356,7 @@ export const useDataSource = (
         records,
         recordsOrder,
         refetchSelectedDateEvents,
+        currentProgramStageId,
     ]);
 
     const persistEventCellValue = useCallback(async ({

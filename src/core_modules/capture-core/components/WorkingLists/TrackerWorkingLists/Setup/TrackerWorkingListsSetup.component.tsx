@@ -252,7 +252,7 @@ export const TrackerWorkingListsSetup = ({
         (template: any) => onDeleteTemplate(template, program.id, listQueryProgramStageId),
         [onDeleteTemplate, program.id, listQueryProgramStageId],
     );
-    const dataSource = useDataSource(records, recordsOrder, columns);
+    const dataSource = useDataSource(records, recordsOrder, columns, effectiveProgramStageId);
     const onLoadViewWithMeta = useInjectDataFetchingMetaToLoadList(
         dataFetchingColumns,
         filtersOnly,
