@@ -113,7 +113,7 @@ const getEventsMetaDataConfig = (
         return [];
     }
 
-    const dataElementsInSection = Array.from(selectedSection.elements.values()).reduce((acc, element: any) => {
+    const dataElementsInSection = Array.from(selectedSection.elements.values()).reduce<any[]>((acc, element: any) => {
         if (element?.fields && typeof element.fields.values === 'function') {
             return acc.concat(Array.from(element.fields.values()));
         }
