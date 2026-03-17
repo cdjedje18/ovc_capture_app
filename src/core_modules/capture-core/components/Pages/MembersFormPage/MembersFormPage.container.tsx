@@ -39,6 +39,8 @@ const handleChangeTemplateUrl = ({
     orgUnitId,
     selectedTemplateId,
     showAllAccessible,
+    masterTEI,
+    relationshipType,
     navigate,
 }: {
     sourceProgramId?: string;
@@ -46,11 +48,15 @@ const handleChangeTemplateUrl = ({
     orgUnitId?: string;
     selectedTemplateId?: string;
     showAllAccessible: boolean;
+    masterTEI?: string;
+    relationshipType?: string;
     navigate: (url: string) => void;
 }) => {
     const query = {
         ...(sourceProgramId ? { programId: sourceProgramId } : {}),
         entryProgram,
+        ...(masterTEI ? { masterTEI } : {}),
+        ...(relationshipType ? { relationshipType } : {}),
     };
 
     if (orgUnitId) {
@@ -129,6 +135,8 @@ const useCallbackMainPage = ({
     orgUnitId,
     sourceProgramId,
     entryProgram,
+    masterTEI,
+    relationshipType,
     showAllAccessible,
     navigate,
     setShowBulkDataEntryPlugin,
@@ -137,6 +145,8 @@ const useCallbackMainPage = ({
     orgUnitId?: string;
     sourceProgramId?: string;
     entryProgram?: string;
+    masterTEI?: string;
+    relationshipType?: string;
     showAllAccessible: boolean;
     navigate: (url: string) => void;
     setShowBulkDataEntryPlugin: (show: boolean) => void;
@@ -149,17 +159,21 @@ const useCallbackMainPage = ({
             orgUnitId,
             selectedTemplateId: id,
             showAllAccessible,
+            masterTEI,
+            relationshipType,
             navigate,
         }),
-        [navigate, orgUnitId, sourceProgramId, entryProgram, showAllAccessible],
+        [navigate, orgUnitId, sourceProgramId, entryProgram, showAllAccessible, masterTEI, relationshipType],
     );
 
     const onSetShowAccessible = useCallback(
         () => navigate(`/membersForm?${buildUrlQueryString({
             ...(sourceProgramId ? { programId: sourceProgramId } : {}),
             ...(entryProgram ? { entryProgram } : {}),
+            ...(masterTEI ? { masterTEI } : {}),
+            ...(relationshipType ? { relationshipType } : {}),
         })}&all`),
-        [navigate, sourceProgramId, entryProgram],
+        [navigate, sourceProgramId, entryProgram, masterTEI, relationshipType],
     );
 
     const onCloseBulkDataEntryPlugin = useCallback(() => {
@@ -186,7 +200,15 @@ const MainPageContainer = () => {
 
     const dispatch = useDispatch();
     const { navigate } = useNavigate();
-    const { all, programId: sourceProgramId, entryProgram, orgUnitId, selectedTemplateId } = useLocationQuery();
+    const {
+        all,
+        programId: sourceProgramId,
+        entryProgram,
+        orgUnitId,
+        selectedTemplateId,
+        masterTEI,
+        relationshipType,
+    } = useLocationQuery();
     const programId = entryProgram || sourceProgramId;
     const showAllAccessible = all !== undefined;
 
@@ -220,6 +242,8 @@ const MainPageContainer = () => {
             orgUnitId,
             sourceProgramId,
             entryProgram: programId,
+            masterTEI,
+            relationshipType,
             showAllAccessible,
             navigate,
             setShowBulkDataEntryPlugin,
@@ -231,6 +255,23 @@ const MainPageContainer = () => {
     }, [showAllAccessible, dispatch]);
 
     useEffect(() => {
+        const selectedTemplateBelongsToDifferentProgram =
+            Boolean(selectedTemplateId && workingListProgramId && workingListProgramId !== programId);
+
+        if (selectedTemplateBelongsToDifferentProgram) {
+            handleChangeTemplateUrl({
+                sourceProgramId,
+                entryProgram: programId || '',
+                orgUnitId,
+                selectedTemplateId: programId ? `${programId}-default` : undefined,
+                showAllAccessible,
+                masterTEI,
+                relationshipType,
+                navigate,
+            });
+            return;
+        }
+
         if (programId && trackedEntityTypeId && selectedTemplateId === undefined) {
             if (reduxSelectedTemplateId && workingListProgramId === programId) {
                 handleChangeTemplateUrl({
@@ -239,6 +280,8 @@ const MainPageContainer = () => {
                     orgUnitId,
                     selectedTemplateId: reduxSelectedTemplateId,
                     showAllAccessible,
+                    masterTEI,
+                    relationshipType,
                     navigate,
                 });
                 return;
@@ -250,6 +293,8 @@ const MainPageContainer = () => {
                 orgUnitId,
                 selectedTemplateId: `${programId}-default`,
                 showAllAccessible,
+                masterTEI,
+                relationshipType,
                 navigate,
             });
         }
@@ -264,6 +309,8 @@ const MainPageContainer = () => {
         navigate,
         reduxSelectedTemplateId,
         workingListProgramId,
+        masterTEI,
+        relationshipType,
     ]);
 
     return (

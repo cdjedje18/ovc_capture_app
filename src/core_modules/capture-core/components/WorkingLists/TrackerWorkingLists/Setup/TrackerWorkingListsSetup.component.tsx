@@ -69,10 +69,12 @@ export const TrackerWorkingListsSetup = ({
 }: Props) => {
     const isMembersFormPage = isMembersFormPageRoute();
     const { dataEntryPrograms } = useMainViewConfig();
-    const dataEntryProgramStageId = useMemo(
-        () => dataEntryPrograms?.find(entry => entry.program === program.id)?.programStage,
-        [dataEntryPrograms, program.id],
-    );
+    const dataEntryProgramStageId = useMemo(() => {
+        const selectedDataEntryProgram =
+            dataEntryPrograms?.find(entry => entry.program === program.id) ?? dataEntryPrograms?.[0];
+
+        return selectedDataEntryProgram?.programStage;
+    }, [dataEntryPrograms, program.id]);
     const effectiveProgramStageId =
         isMembersFormPage ? (dataEntryProgramStageId || programStageId) : programStageId;
     const listQueryProgramStageId = effectiveProgramStageId;
@@ -126,7 +128,6 @@ export const TrackerWorkingListsSetup = ({
         sortByDirection,
         isDefaultTemplateAltered: storedTemplates?.find(template => template.isDefault)?.isAltered,
     });
-    const membersListReady = !isMembersFormPage || !!effectiveProgramStageId;
     const membersDataReadyTrigger = useMemo(() => {
         if (!isMembersFormPage) {
             return customUpdateTrigger;
@@ -263,10 +264,6 @@ export const TrackerWorkingListsSetup = ({
         onUpdateList,
     );
     const onRowClickNoop = useCallback(() => {}, []);
-
-    if (!membersListReady) {
-        return null;
-    }
 
     return (
         <WorkingListsBase

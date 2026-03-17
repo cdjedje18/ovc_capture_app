@@ -87,7 +87,7 @@ export const useMainViewConfig: UseMainViewConfig = () => {
         ['dataStore', 'ovc_capture_app'], {
             resource: 'dataStore/ovc_capture_app/data_entry',
         }, {
-            enabled: captureKeys?.includes('data_entry'),
+            enabled: !namespaceIsLoading,
             select: (dataEntryConfig: DataStoreDataEntry) =>
                 (dataEntryConfig?.programs ?? [])
                     .filter(({ program, programStage }) => isString(program) && isString(programStage))
