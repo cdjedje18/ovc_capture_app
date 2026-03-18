@@ -880,8 +880,8 @@ msgstr "The category option is not valid for the selected organisation unit."
 msgid "Please select a valid combination."
 msgstr "Please select a valid combination."
 
-msgid "Get started with Capture app"
-msgstr "Get started with Capture app"
+msgid "Get started with OVC Capture App"
+msgstr "Get started with OVC Capture App"
 
 msgid "Report data"
 msgstr "Report data"
@@ -2257,3 +2257,4 @@ msgstr ""
 "This app is currently running in compatibility mode due to browser "
 "restrictions. For better performance, use another browser or exit private "
 "mode if this is currently in use."
+

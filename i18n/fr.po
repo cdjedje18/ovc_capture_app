@@ -852,7 +852,7 @@ msgstr ""
 msgid "Please select a valid combination."
 msgstr "Veuillez sélectionner une combinaison valide."
 
-msgid "Get started with Capture app"
+msgid "Get started with OVC Capture App"
 msgstr "Commencer avec l'application Saisie"
 
 msgid "Report data"
@@ -2416,3 +2416,4 @@ msgstr ""
 " des restrictions du navigateur. Pour obtenir de meilleures performances, "
 "utilisez un autre navigateur ou quittez le mode privé si celui-ci est en "
 "cours d'utilisation."
+

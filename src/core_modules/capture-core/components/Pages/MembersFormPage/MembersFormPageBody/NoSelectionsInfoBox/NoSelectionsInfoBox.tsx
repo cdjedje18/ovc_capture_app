@@ -70,7 +70,7 @@ const NoSelectionsInfoBoxPlain = ({ classes }: Props) => (
                 <EmptyStateIcon />
             </div>
             <h1 className={classes.headingText}>
-                {i18n.t('Get started with Capture app')}
+                {i18n.t('Get started with OVC Capture App')}
             </h1>
             <div className={classes.content}>
                 <span>
@@ -96,3 +96,4 @@ const NoSelectionsInfoBoxPlain = ({ classes }: Props) => (
 );
 
 export const NoSelectionsInfoBox = withStyles(styles)(NoSelectionsInfoBoxPlain);
+

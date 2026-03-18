@@ -807,7 +807,7 @@ msgstr ""
 msgid "Please select a valid combination."
 msgstr ""
 
-msgid "Get started with Capture app"
+msgid "Get started with OVC Capture App"
 msgstr "Почніть роботу з додатком Фіксація"
 
 msgid "Report data"
@@ -2265,3 +2265,4 @@ msgid ""
 "restrictions. For better performance, use another browser or exit private "
 "mode if this is currently in use."
 msgstr ""
+

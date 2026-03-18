@@ -794,7 +794,7 @@ msgstr "类别选项对所选组织单位无效。"
 msgid "Please select a valid combination."
 msgstr "请选择一个有效的组合。"
 
-msgid "Get started with Capture app"
+msgid "Get started with OVC Capture App"
 msgstr "开始使用采集应用程序"
 
 msgid "Report data"
@@ -2190,3 +2190,4 @@ msgid ""
 "restrictions. For better performance, use another browser or exit private "
 "mode if this is currently in use."
 msgstr "由于浏览器的限制，此应用程序目前在兼容模式下运行。如果当前使用的是兼容模式，请使用其他浏览器或退出隐私模式，以获得更好的性能。"
+

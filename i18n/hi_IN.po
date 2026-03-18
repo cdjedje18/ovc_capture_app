@@ -793,7 +793,7 @@ msgstr ""
 msgid "Please select a valid combination."
 msgstr "कृपया एक मान्य संयोजन चुनें।"
 
-msgid "Get started with Capture app"
+msgid "Get started with OVC Capture App"
 msgstr "कैप्चर ऐप के साथ शुरू करें"
 
 msgid "Report data"
@@ -2201,3 +2201,4 @@ msgid ""
 "restrictions. For better performance, use another browser or exit private "
 "mode if this is currently in use."
 msgstr ""
+
