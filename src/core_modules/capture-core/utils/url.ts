@@ -3,9 +3,12 @@ import { getLocationQuery } from './routing';
 
 export type Url = {
     programId?: string;
+    entryProgram?: string;
     orgUnitId?: string;
     trackedEntityTypeId?: string;
     teiId?: string;
+    masterTEI?: string;
+    relationshipType?: string;
     enrollmentId?: string;
     stageId?: string;
     eventId?: string;
@@ -24,9 +27,12 @@ export const deriveUrlQueries = (state: any) => {
     } = state;
     const {
         programId: routerProgramId,
+        entryProgram,
         orgUnitId: routerOrgUnitId,
         trackedEntityTypeId: routerTet,
         teiId,
+        masterTEI,
+        relationshipType,
         enrollmentId,
     } = getLocationQuery();
 
@@ -36,9 +42,12 @@ export const deriveUrlQueries = (state: any) => {
 
     return {
         programId,
+        entryProgram,
         orgUnitId,
         trackedEntityTypeId,
         teiId,
+        masterTEI,
+        relationshipType,
         enrollmentId,
     };
 };

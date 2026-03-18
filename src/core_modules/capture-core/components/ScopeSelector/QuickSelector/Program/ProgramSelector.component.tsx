@@ -12,6 +12,7 @@ import { ProgramList } from './ProgramList';
 import { getOptions } from './getOptions';
 import { OptionLabel } from '../../OptionLabel';
 import { useDataQuery } from '@dhis2/app-runtime';
+import { isMembersFormPage as isMembersFormPageRoute } from '../../../WorkingLists/utils/isMembersFormPage';
 
 
 const dataStoreQuery = {
@@ -71,7 +72,8 @@ const ProgramSelectorPlain = ({
     const [programsArray, setProgramsArray] = useState<Array<Program>>([]);
     const selectedProgram = selectedProgramId ? programCollection.get(selectedProgramId) : null;
     const programOptions = getOptions(programsArray, selectedOrgUnitId);
-    const isMenuDisabled = !handleClickProgram;
+    const isMembersFormPage = isMembersFormPageRoute();
+    const isMenuDisabled = !handleClickProgram || isMembersFormPage;
 
     const programsDataStoreQuery = useDataQuery(dataStoreQuery, {
         lazy: true,
@@ -112,7 +114,7 @@ const ProgramSelectorPlain = ({
                     onSelect={option => handleSetCatergoryCombo && handleSetCatergoryCombo(option, category.id)}
                     onClearSelectionClick={() => onResetCategoryOption(category.id)}
                     selectedOrgUnitId={selectedOrgUnitId}
-                    displayOnly={formIsOpen}
+                    displayOnly={formIsOpen || isMenuDisabled}
                 />
             ));
         }
@@ -130,7 +132,7 @@ const ProgramSelectorPlain = ({
                 open={open}
                 setOpen={openSelectorBarItem => (isMenuDisabled ? null : setOpen(openSelectorBarItem))}
                 displayOnly={isMenuDisabled}
-                onClearSelectionClick={() => onResetProgramId(resetProgramIdBase())}
+                onClearSelectionClick={!isMenuDisabled ? () => onResetProgramId(resetProgramIdBase()) : undefined}
                 dataTest="program-selector-container"
             >
                 <div className={classes.selectBarMenu}>

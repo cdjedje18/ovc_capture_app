@@ -5,6 +5,7 @@ import { SelectorBarItem, spacers } from '@dhis2/ui';
 import { withStyles, type WithStyles } from 'capture-core-utils/styles';
 import { OrgUnitField } from '../../FormFields/New';
 import { ConditionalTooltip } from '../../Tooltips/ConditionalTooltip';
+import { isMembersFormPage as isMembersFormPageRoute } from '../../WorkingLists/utils/isMembersFormPage';
 
 const styles = () => ({
     selectBarMenu: {
@@ -55,6 +56,8 @@ class OrgUnitSelectorPlain extends Component<Props, State> {
 
     render() {
         const { selectedOrgUnitId, selectedOrgUnit, previousOrgUnitId, onReset, isReadOnly, tooltip, classes } = this.props;
+        const isReadOnlyForMembers = isMembersFormPageRoute();
+        const isReadOnlyResolved = Boolean(isReadOnly || isReadOnlyForMembers);
 
         return (
             <ConditionalTooltip
@@ -63,12 +66,14 @@ class OrgUnitSelectorPlain extends Component<Props, State> {
             >
                 <SelectorBarItem
                     label={i18n.t('Organisation unit')}
-                    noValueMessage={isReadOnly ? i18n.t('None selected') : i18n.t('Choose an organisation unit')}
+                    noValueMessage={
+                        isReadOnlyResolved ? i18n.t('None selected') : i18n.t('Choose an organisation unit')
+                    }
                     value={selectedOrgUnitId ? selectedOrgUnit?.name : ''}
-                    open={!isReadOnly && this.state.open}
+                    open={!isReadOnlyResolved && this.state.open}
                     setOpen={open => this.setState({ open })}
-                    onClearSelectionClick={!isReadOnly ? () => onReset() : undefined}
-                    displayOnly={isReadOnly}
+                    onClearSelectionClick={!isReadOnlyResolved ? () => onReset() : undefined}
+                    displayOnly={isReadOnlyResolved}
                     dataTest="org-unit-selector-container"
                 >
                     <div className={classes.selectBarMenu}>

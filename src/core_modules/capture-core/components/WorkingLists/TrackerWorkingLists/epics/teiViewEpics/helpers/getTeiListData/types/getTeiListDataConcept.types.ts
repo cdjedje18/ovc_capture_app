@@ -8,6 +8,18 @@ export type ApiTeiAttributes = Array<{
 export type ApiTei = {
     trackedEntity: string,
     attributes?: ApiTeiAttributes,
+    enrollments?: Array<{
+        enrollment: string,
+        orgUnit: string,
+        program?: string,
+        status?: string,
+        events?: Array<{
+            event: string,
+            occurredAt?: string,
+            program?: string,
+            programStage?: string,
+        }>,
+    }>,
     programOwners: Array<{
         orgUnit: string,
         program: string,
@@ -26,6 +38,7 @@ export type RawQueryArgs = {
     page: number,
     pageSize: number,
     programId: string,
+    programStageId?: string,
     orgUnitId: string,
     filters?: RawFilterQueryArgs,
     sortById: string,

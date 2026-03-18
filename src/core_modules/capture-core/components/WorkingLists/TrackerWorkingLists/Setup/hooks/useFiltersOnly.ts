@@ -5,47 +5,13 @@ import { dataElementTypes, type TrackerProgram } from '../../../../../metaData';
 import { MAIN_FILTERS } from '../../constants';
 
 export const useFiltersOnly = (
-    { enrollment: { enrollmentDateLabel, incidentDateLabel, showIncidentDate }, stages }: TrackerProgram,
+    { enrollment: { incidentDateLabel, showIncidentDate }, stages }: TrackerProgram,
     programStageId?: string,
 ) =>
     useMemo(() => {
         const enableUserAssignment =
             !programStageId && Array.from(stages.values()).find((stage: any) => stage.enableUserAssignment);
         return [
-            {
-                id: MAIN_FILTERS.PROGRAM_STATUS,
-                type: dataElementTypes.TEXT,
-                header: i18n.t('Enrollment status'),
-                options: [
-                    { text: i18n.t('Active'), value: 'ACTIVE' },
-                    { text: i18n.t('Completed'), value: 'COMPLETED' },
-                    { text: i18n.t('Cancelled'), value: 'CANCELLED' },
-                ],
-                transformRecordsFilter: (rawFilter: string) => ({
-                    [featureAvailable(FEATURES.enrollmentStatusReplaceProgramStatusQueryParam)
-                        ? 'enrollmentStatus'
-                        : 'programStatus'
-                    ]: rawFilter.split(':')[1],
-                }),
-            },
-            {
-                id: MAIN_FILTERS.ENROLLED_AT,
-                type: dataElementTypes.DATE,
-                header: enrollmentDateLabel,
-                transformRecordsFilter: (filter: string) => {
-                    const queryArgs: any = {};
-                    const filterParts = filter.split(':');
-                    const indexGe = filterParts.indexOf('ge');
-                    const indexLe = filterParts.indexOf('le');
-                    if (indexGe !== -1 && filterParts[indexGe + 1]) {
-                        queryArgs.enrollmentEnrolledAfter = filterParts[indexGe + 1];
-                    }
-                    if (indexLe !== -1 && filterParts[indexLe + 1]) {
-                        queryArgs.enrollmentEnrolledBefore = filterParts[indexLe + 1];
-                    }
-                    return queryArgs;
-                },
-            },
             ...(showIncidentDate
                 ? [
                     {
@@ -99,4 +65,4 @@ export const useFiltersOnly = (
                 ]
                 : []),
         ];
-    }, [enrollmentDateLabel, incidentDateLabel, showIncidentDate, stages, programStageId]);
+    }, [incidentDateLabel, showIncidentDate, stages, programStageId]);

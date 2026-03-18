@@ -15,7 +15,7 @@ export const useColumns = <TColumnConfigs extends Array<{ id: string, visible: b
             return defaultColumns;
         }
 
-        const result = customColumnOrder.reduce((acc: any[], { id, visible }) => {
+        const columnsFromCustomOrder = customColumnOrder.reduce((acc: any[], { id, visible }) => {
             if (defaultColumnsAsObject[id]) {
                 return [
                     ...acc,
@@ -28,6 +28,9 @@ export const useColumns = <TColumnConfigs extends Array<{ id: string, visible: b
             return acc;
         }, []);
 
-        return result as TColumnConfigs;
+        const customOrderIds = new Set(columnsFromCustomOrder.map(column => column.id));
+        const columnsMissingFromCustomOrder = defaultColumns.filter(column => !customOrderIds.has(column.id));
+
+        return [...columnsFromCustomOrder, ...columnsMissingFromCustomOrder] as TColumnConfigs;
     }, [customColumnOrder, defaultColumns, defaultColumnsAsObject]);
 };

@@ -17,9 +17,10 @@ export const initTeiViewEpic = (
         filter(({ payload: { workingListsType } }) => workingListsType === TRACKER_WORKING_LISTS_TYPE),
         concatMap((action) => {
             const { storeId, columnsMetaForDataFetching, filtersOnlyMetaForDataFetching, selectedTemplate } = action.payload;
-            const { programId, orgUnitId } = action.payload.context;
+            const { programId, orgUnitId, programStageId } = action.payload.context;
             return from(initTrackerWorkingListsViewAsync({
                 programId,
+                programStageId,
                 orgUnitId,
                 storeId,
                 selectedTemplate,

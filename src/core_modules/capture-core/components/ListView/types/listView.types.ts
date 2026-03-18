@@ -11,6 +11,7 @@ export type Column = {
     multiValueFilter?: boolean;
     filterHidden?: boolean;
     additionalColumn?: boolean;
+    hideInColumnSelector?: boolean;
     unique?: boolean;
     searchOperator?: string;
     minCharactersToSearch?: number;
