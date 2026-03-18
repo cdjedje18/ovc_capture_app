@@ -29,8 +29,8 @@ import {
 } from '../../../WorkingLists/WorkingListsBase/membersVisitDate.store';
 import { TRACKER_WORKING_LISTS_STORE_ID } from '../../../WorkingLists/TrackerWorkingLists/constants/trackerWorkingListsType';
 import { EventDateSelector } from './EventDateSelector.component';
+import { deriveTeiName } from '../../common/EnrollmentOverviewDomain/useTeiDisplayName';
 
-const FAMILY_NAME_ATTRIBUTE_ID = 'a8GQzSXuCH7';
 type EventDateOption = {
     value: string;
     label: string;
@@ -43,7 +43,7 @@ const masterTeiQuery: any = {
         resource: 'tracker/trackedEntities',
         params: ({ masterTeiId }) => ({
             [featureAvailable(FEATURES.newEntityFilterQueryParam) ? 'trackedEntities' : 'trackedEntity']: masterTeiId,
-            fields: 'trackedEntity,attributes[attribute,value]',
+            fields: 'trackedEntity,trackedEntityType,attributes[attribute,value,valueType]',
             page: 1,
             pageSize: 1,
         }),
@@ -77,12 +77,14 @@ export const TopBar = ({ sourceProgramId, entryProgramId, orgUnitId, selectedCat
         },
         [dispatch],
     );
+
     const dispatchOnResetCategoryOption = useCallback(
         (categoryId: string) => {
             dispatch(resetCategoryOption(categoryId));
         },
         [dispatch],
     );
+
     const dispatchOnResetAllCategoryOptions = useCallback(() => {
         dispatch(resetAllCategoryOptions());
     }, [dispatch]);
@@ -94,15 +96,19 @@ export const TopBar = ({ sourceProgramId, entryProgramId, orgUnitId, selectedCat
         },
         [dispatch, setOrgUnitId],
     );
-    const selectedFamilyName = useMemo(() => {
+    const teiDisplayName = useMemo(() => {
         const masterTeiResults = masterTeiData?.results as any;
         const trackedEntity =
             masterTeiResults?.trackedEntities?.[0]
             || masterTeiResults?.instances?.[0];
-        return trackedEntity?.attributes
-            ?.find(({ attribute }) => attribute === FAMILY_NAME_ATTRIBUTE_ID)
-            ?.value;
+
+        if (!trackedEntity?.attributes || !trackedEntity?.trackedEntityType || !masterTEI) {
+            return '';
+        }
+
+        return deriveTeiName(trackedEntity.attributes, trackedEntity.trackedEntityType, masterTEI);
     }, [masterTeiData, masterTEI]);
+
     const eventDateOptions = useMemo<EventDateOption[]>(() => {
         const eventDatesFromRecords: string[] = (recordsOrder || [])
             .map((recordId: string) => records?.[recordId]?.__occurredAt?.slice(0, 10))
@@ -169,8 +175,8 @@ export const TopBar = ({ sourceProgramId, entryProgramId, orgUnitId, selectedCat
                 displayOnly
             />
             <SelectorBarItem
-                label="Familia"
-                value={selectedFamilyName || ''}
+                label="Família"
+                value={teiDisplayName || ''}
                 displayOnly
             />
         </ScopeSelector>
