@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import moment from 'moment';
 import { useConfig, useDataMutation, useDataQuery } from '@dhis2/app-runtime';
 import { Button } from '@dhis2/ui';
@@ -54,6 +54,26 @@ const SELECTED_DATE_EVENTS_QUERY: any = {
 const getOccurredAtDate = (occurredAt?: string) => occurredAt?.slice(0, 10);
 const DEFAULT_OVERRIDE_SCOPE = '__default';
 const getJoinedTeiIds = (teiIds: Array<string>) => teiIds.join(featureAvailable(FEATURES.newUIDsSeparator) ? ',' : ';');
+const getFieldSaveStatusKey = (rowId: string, columnId: string) => `${rowId}:${columnId}`;
+
+const throwIfTrackerMutationFailed = (response: any) => {
+    const normalizedResponse = response?.response || response?.details || response;
+    const errorReports = normalizedResponse?.validationReport?.errorReports;
+    const hasValidationErrors = Array.isArray(errorReports) && errorReports.length > 0;
+    const hasErrorStatus = normalizedResponse?.status === 'ERROR';
+
+    if (!hasValidationErrors && !hasErrorStatus) {
+        return;
+    }
+
+    const validationMessage = hasValidationErrors
+        ? errorReports.map((errorReport: { message?: string }) => errorReport.message).filter(Boolean).join(' ')
+        : undefined;
+
+    const error = new Error(validationMessage || 'Tracker event mutation failed');
+    (error as Error & { details?: any }).details = normalizedResponse;
+    throw error;
+};
 
 const hasEventForSelectedDate = ({
     isMembersFormPage,
@@ -260,6 +280,8 @@ export const useDataSource = (
     } = useDataQuery(SELECTED_DATE_EVENTS_QUERY, { lazy: true });
     const [saveEventMutation] = useDataMutation(TRACKER_EVENT_MUTATION);
     const [recordOverrides, setRecordOverrides] = useState<{ [key: string]: { [key: string]: any } }>({});
+    const [fieldSaveStatusById, setFieldSaveStatusById] = useState<Record<string, 'idle' | 'saving' | 'success' | 'error'>>({});
+    const fieldSaveTimeoutsRef = useRef<Record<string, number>>({});
     const activeOverrideScopeKey = getOverrideScopeKey({
         isMembersFormPage,
         selectedMembersVisitDate,
@@ -384,7 +406,6 @@ export const useDataSource = (
             programId,
             programStageId,
             occurredAt: existingOccurredAt,
-            syntheticForSelectedDate,
         } = getEventMetadata(eventRecord);
         const shouldReuseExistingEvent = Boolean(eventId) && hasEventForSelectedDate({
             isMembersFormPage,
@@ -443,12 +464,58 @@ export const useDataSource = (
                 [EVENT_METADATA_KEYS.syntheticForSelectedDate]: true,
             } : {}),
         };
+        const fieldSaveStatusKey = getFieldSaveStatusKey(rowId, column.id);
+        const clearFieldStatusTimeout = () => {
+            const timeoutId = fieldSaveTimeoutsRef.current[fieldSaveStatusKey];
+            if (timeoutId) {
+                window.clearTimeout(timeoutId);
+                delete fieldSaveTimeoutsRef.current[fieldSaveStatusKey];
+            }
+        };
+        const setFieldSaveStatus = (status: 'saving' | 'success' | 'error') => {
+            setFieldSaveStatusById(currentStatus => ({
+                ...currentStatus,
+                [fieldSaveStatusKey]: status,
+            }));
+        };
+        const scheduleFieldSaveStatusReset = (status: 'success' | 'error', timeoutMs: number) => {
+            clearFieldStatusTimeout();
+            fieldSaveTimeoutsRef.current[fieldSaveStatusKey] = window.setTimeout(() => {
+                delete fieldSaveTimeoutsRef.current[fieldSaveStatusKey];
+                setFieldSaveStatusById((currentStatus) => {
+                    if (currentStatus[fieldSaveStatusKey] !== status) {
+                        return currentStatus;
+                    }
+
+                    return {
+                        ...currentStatus,
+                        [fieldSaveStatusKey]: 'idle',
+                    };
+                });
+            }, timeoutMs);
+        };
+
+        clearFieldStatusTimeout();
+        setFieldSaveStatus('saving');
+        fieldSaveTimeoutsRef.current[fieldSaveStatusKey] = window.setTimeout(() => {
+            delete fieldSaveTimeoutsRef.current[fieldSaveStatusKey];
+            setFieldSaveStatusById((currentStatus) => {
+                if (currentStatus[fieldSaveStatusKey] !== 'saving') {
+                    return currentStatus;
+                }
+
+                return {
+                    ...currentStatus,
+                    [fieldSaveStatusKey]: 'error',
+                };
+            });
+        }, 5000);
 
         setRecordOverrides(currentOverrides =>
             applyRecordOverridePatch(currentOverrides, overrideScopeKey, rowId, overridePatch));
 
         try {
-            await saveEventMutation({
+            const mutationResponse = await saveEventMutation({
                 events: [{
                     event: targetEventId,
                     trackedEntity: teiId,
@@ -464,7 +531,12 @@ export const useDataSource = (
                     }],
                 }],
             });
+            throwIfTrackerMutationFailed(mutationResponse);
+            setFieldSaveStatus('success');
+            scheduleFieldSaveStatusReset('success', 1800);
         } catch (error) {
+            setFieldSaveStatus('error');
+            scheduleFieldSaveStatusReset('error', 2500);
             setRecordOverrides(currentOverrides => revertRecordOverridePatch({
                 currentOverrides,
                 scopeKey: overrideScopeKey,
@@ -473,7 +545,14 @@ export const useDataSource = (
                 existingClientValue,
                 eventId: targetExistingEventId,
             }));
-            throw error;
+            log.error(
+                errorCreator('Could not persist inline event value')({
+                    error,
+                    columnId: column.id,
+                    rowId,
+                }),
+            );
+            return;
         }
 
         if (!targetExistingEventId) {
@@ -532,19 +611,12 @@ export const useDataSource = (
                             column,
                             value: clientValue,
                             disabled: isMembersFormLocked,
+                            saveStatus: fieldSaveStatusById[getFieldSaveStatusKey(eventRecord.id, id)] || 'idle',
                             onCommit: (nextClientValue: any) => {
-                                persistEventCellValue({
+                                void persistEventCellValue({
                                     eventRecord,
                                     column,
                                     nextClientValue,
-                                }).catch((error) => {
-                                    log.error(
-                                        errorCreator('Could not persist inline event value')({
-                                            error,
-                                            columnId: id,
-                                            rowId: eventRecord.id,
-                                        }),
-                                    );
                                 });
                             },
                         });
@@ -586,6 +658,7 @@ export const useDataSource = (
         eventRecordsArray,
         columns,
         baseUrl,
+        fieldSaveStatusById,
         isMembersFormPage,
         isMembersFormLocked,
         persistEventCellValue,
