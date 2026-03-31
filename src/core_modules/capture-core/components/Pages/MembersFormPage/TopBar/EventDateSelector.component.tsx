@@ -32,19 +32,21 @@ export const EventDateSelector = ({
             setOpen={setOpen}
             onClearSelectionClick={() => onSelect(undefined)}
         >
-            <Menu>
-                {options.map(option => (
-                    <MenuItem
-                        key={option.value}
-                        label={option.label}
-                        value={option.value}
-                        onClick={({ value }) => {
-                            onSelect(value);
-                            setOpen(false);
-                        }}
-                    />
-                ))}
-            </Menu>
+            <div style={{ maxHeight: 320, overflowY: 'auto' }}>
+                <Menu>
+                    {options.map(option => (
+                        <MenuItem
+                            key={option.value}
+                            label={option.label}
+                            value={option.value}
+                            onClick={({ value }) => {
+                                onSelect(value);
+                                setOpen(false);
+                            }}
+                        />
+                    ))}
+                </Menu>
+            </div>
         </SelectorBarItem>
     );
 };
