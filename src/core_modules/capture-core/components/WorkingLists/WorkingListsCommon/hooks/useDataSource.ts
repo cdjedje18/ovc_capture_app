@@ -404,9 +404,10 @@ export const useDataSource = (
             enrollmentId,
             orgUnitId,
             programId,
-            programStageId,
+            programStageId: recordProgramStageId,
             occurredAt: existingOccurredAt,
         } = getEventMetadata(eventRecord);
+        const programStageId = currentProgramStageId || recordProgramStageId;
         const shouldReuseExistingEvent = Boolean(eventId) && hasEventForSelectedDate({
             isMembersFormPage,
             selectedMembersVisitDate,
@@ -560,7 +561,7 @@ export const useDataSource = (
             eventRecord[EVENT_METADATA_KEYS.occurredAt] = nextOccurredAt;
             eventRecord[EVENT_METADATA_KEYS.syntheticForSelectedDate] = true;
         }
-    }, [isMembersFormPage, saveEventMutation, selectedMembersVisitDate]);
+    }, [currentProgramStageId, isMembersFormPage, saveEventMutation, selectedMembersVisitDate]);
 
     return useMemo(() => eventRecordsArray && eventRecordsArray
         .map((eventRecord) => {

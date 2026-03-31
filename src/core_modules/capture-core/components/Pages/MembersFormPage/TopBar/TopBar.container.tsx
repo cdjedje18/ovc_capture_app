@@ -63,6 +63,7 @@ export const TopBar = ({ sourceProgramId, entryProgramId, orgUnitId, selectedCat
     const availableMembersVisitDates = useAvailableMembersVisitDates();
     const selectedMembersVisitDate = useSelectedMembersVisitDate();
     const [cachedEventDates, setCachedEventDates] = useState<string[]>([]);
+    const previousContextRef = React.useRef<{ masterTEI?: string, entryProgramId?: string } | null>(null);
     const { records, recordsOrder } = useSelector(({
         workingListsListRecords,
         workingLists,
@@ -146,6 +147,20 @@ export const TopBar = ({ sourceProgramId, entryProgramId, orgUnitId, selectedCat
     }, [records, recordsOrder]);
 
     useEffect(() => {
+        const previousContext = previousContextRef.current;
+        previousContextRef.current = { masterTEI, entryProgramId };
+
+        if (!previousContext) {
+            return;
+        }
+
+        if (
+            previousContext.masterTEI === masterTEI
+            && previousContext.entryProgramId === entryProgramId
+        ) {
+            return;
+        }
+
         setCachedEventDates([]);
         setSelectedMembersVisitDate(undefined);
     }, [masterTEI, entryProgramId]);
