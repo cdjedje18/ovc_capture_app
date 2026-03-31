@@ -17,9 +17,67 @@ type Props = {
     value: any;
     onCommit: (value: any) => void;
     disabled?: boolean;
+    saveStatus?: 'idle' | 'saving' | 'success' | 'error';
 };
 
 const MULTI_TEXT_SEPARATOR = ',';
+const NUMBER_TYPES = new Set([
+    dataElementTypes.NUMBER,
+    dataElementTypes.INTEGER,
+    dataElementTypes.INTEGER_POSITIVE,
+    dataElementTypes.INTEGER_NEGATIVE,
+    dataElementTypes.INTEGER_ZERO_OR_POSITIVE,
+]);
+
+const isValidNumericDraft = (value: string, type: string) => {
+    if (!NUMBER_TYPES.has(type as any)) {
+        return true;
+    }
+
+    if (value === '') {
+        return true;
+    }
+
+    switch (type) {
+    case dataElementTypes.NUMBER:
+        return /^-?\d*(?:[.]\d*)?$/.test(value);
+    case dataElementTypes.INTEGER:
+        return /^-?\d*$/.test(value);
+    case dataElementTypes.INTEGER_POSITIVE:
+        return /^\d*$/.test(value) && value !== '0';
+    case dataElementTypes.INTEGER_NEGATIVE:
+        return /^-\d*$/.test(value);
+    case dataElementTypes.INTEGER_ZERO_OR_POSITIVE:
+        return /^\d*$/.test(value);
+    default:
+        return true;
+    }
+};
+
+const isValidNumericCommit = (value: string, type: string) => {
+    if (!NUMBER_TYPES.has(type as any)) {
+        return true;
+    }
+
+    if (value === '') {
+        return true;
+    }
+
+    switch (type) {
+    case dataElementTypes.NUMBER:
+        return /^-?\d+(?:[.]\d+)?$/.test(value);
+    case dataElementTypes.INTEGER:
+        return /^-?\d+$/.test(value);
+    case dataElementTypes.INTEGER_POSITIVE:
+        return /^[1-9]\d*$/.test(value);
+    case dataElementTypes.INTEGER_NEGATIVE:
+        return /^-\d+$/.test(value);
+    case dataElementTypes.INTEGER_ZERO_OR_POSITIVE:
+        return /^\d+$/.test(value) || value === '0';
+    default:
+        return true;
+    }
+};
 
 const normalizeDateValue = (rawValue: any) => {
     if (!rawValue || typeof rawValue !== 'string') {
@@ -39,6 +97,7 @@ export const InlineEventCellField = React.memo(({
     value,
     onCommit,
     disabled,
+    saveStatus = 'idle',
 }: Props) => {
     const [localValue, setLocalValue] = useState<any>(value ?? null);
 
@@ -63,7 +122,49 @@ export const InlineEventCellField = React.memo(({
         onCommit(nextValue);
     }, [onCommit, disabled]);
 
+    const handleNumericChange = useCallback((nextValue: string) => {
+        if (disabled || !isValidNumericDraft(nextValue, column.type)) {
+            return;
+        }
+
+        setLocalValue(nextValue);
+    }, [column.type, disabled]);
+
+    const handleNumericBlur = useCallback((nextValue: string) => {
+        if (disabled) {
+            return;
+        }
+
+        if (!isValidNumericCommit(nextValue, column.type)) {
+            setLocalValue(value ?? '');
+            return;
+        }
+
+        commit(nextValue);
+    }, [column.type, commit, disabled, value]);
+
     const commonStyle = { minWidth: 180 };
+    const statusNode = saveStatus !== 'idle'
+        ? (
+            <div
+                style={{
+                    fontSize: 12,
+                    marginTop: 4,
+                    color: saveStatus === 'error'
+                        ? '#d32f2f'
+                        : saveStatus === 'success'
+                            ? '#18c23d'
+                            : '#dcc414',
+                }}
+            >
+                {saveStatus === 'saving'
+                    ? 'Enviando dados...'
+                    : saveStatus === 'success'
+                        ? 'Enviado'
+                        : 'Falha ao guardar'}
+            </div>
+        )
+        : null;
 
     if (column.options && column.type !== dataElementTypes.MULTI_TEXT) {
         return (
@@ -75,6 +176,7 @@ export const InlineEventCellField = React.memo(({
                     clearable
                     disabled={disabled}
                 />
+                {statusNode}
             </div>
         );
     }
@@ -92,6 +194,7 @@ export const InlineEventCellField = React.memo(({
                     onSelect={commit}
                     disabled={disabled}
                 />
+                {statusNode}
             </div>
         );
     }
@@ -107,6 +210,7 @@ export const InlineEventCellField = React.memo(({
                     width={180}
                     disabled={disabled}
                 />
+                {statusNode}
             </div>
         );
     }
@@ -119,6 +223,7 @@ export const InlineEventCellField = React.memo(({
                     onBlur={commit}
                     disabled={disabled}
                 />
+                {statusNode}
             </div>
         );
     }
@@ -131,6 +236,22 @@ export const InlineEventCellField = React.memo(({
                     onBlur={commit}
                     disabled={disabled}
                 />
+                {statusNode}
+            </div>
+        );
+    }
+
+    if (NUMBER_TYPES.has(column.type as any)) {
+        return (
+            <div style={commonStyle}>
+                <TextField
+                    value={localValue ?? ''}
+                    onChange={handleNumericChange}
+                    onBlur={handleNumericBlur}
+                    disabled={disabled}
+                    inputMode={column.type === dataElementTypes.NUMBER ? 'decimal' : 'numeric'}
+                />
+                {statusNode}
             </div>
         );
     }
@@ -143,6 +264,7 @@ export const InlineEventCellField = React.memo(({
                 onBlur={commit}
                 disabled={disabled}
             />
+            {statusNode}
         </div>
     );
 });
