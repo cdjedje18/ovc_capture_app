@@ -7,8 +7,8 @@ import { OrgUnitsGroupsConfigState } from "../../../schema/orgUnitsGroupSchema";
 import { useFormatProgramRulesVariables } from "../hooks/useFormatProgramRulesVariables";
 
 interface RulesEngineProps {
-    variables: any[]
-    values: Record<string, any>
+    variables?: any[]
+    values?: Record<string, any>
     type: "programStage" | "programStageSection" | "attributesSection"
     program: string,
 }
@@ -20,30 +20,31 @@ export const CustomDhis2RulesEngine = (props: RulesEngineProps) => {
     const { programRulesVariables } = useFormatProgramRulesVariables(program);
     const { newProgramRules } = useFormatProgramRules(program);
 
-    const [currentValues, setCurrentValues] = useState({ ...props.values });
-    const [updatedVariables, setUpdatedVariables] = useState<any[]>(Array.isArray(props.variables) ? [...props.variables] : []);
+    // const [currentValues, setCurrentValues] = useState({ ...props.values });
+    // const [updatedVariables, setUpdatedVariables] = useState<any[]>(Array.isArray(props.variables) ? [...props.variables] : []);
 
-    useEffect(() => {
-        if (!isEqual(updatedVariables, props.variables)) {
-            setUpdatedVariables([...props.variables]);
-        }
-    }, [props.variables]);
+    // useEffect(() => {
+    //     if (!isEqual(updatedVariables, props.variables)) {
+    //         setUpdatedVariables([...props.variables]);
+    //     }
+    // }, [props.variables]);
 
     function runRulesEngine(arg?: { overrideVariables?: any[], overrideValues?: Record<string, any> }) {
         const { overrideVariables = [], overrideValues = {} } = arg || {};
-        const variablesToUse = overrideVariables.length ? overrideVariables : props.variables;
-        const valuesToUse = Object.keys(overrideValues).length ? overrideValues : props.values;
+        const variablesToUse = overrideVariables
+        const valuesToUse = overrideValues
 
-        if (!isEqual(currentValues, valuesToUse)) {
-            setCurrentValues({ ...valuesToUse });
-        }
-        if (!isEqual(updatedVariables, variablesToUse)) {
-            setUpdatedVariables([...variablesToUse]);
-        }
+        // console.log(valuesToUse, variablesToUse, 'yuiiiii')
+        // if (!isEqual(currentValues, valuesToUse)) {
+        //     setCurrentValues({ ...valuesToUse });
+        // }
+        // if (!isEqual(updatedVariables, variablesToUse)) {
+        //     setUpdatedVariables([...variablesToUse]);
+        // }
 
-        if (type === "programStageSection") rulesEngineSections(variablesToUse, valuesToUse);
-        else if (type === "programStage") rulesEngineDataElements(variablesToUse, valuesToUse);
-        else if (type === "attributesSection") rulesEngineAttributesSections(variablesToUse, valuesToUse);
+        if (type === "programStageSection") return rulesEngineSections(variablesToUse, valuesToUse);
+        else if (type === "programStage") return rulesEngineDataElements(variablesToUse, valuesToUse);
+        else if (type === "attributesSection") return rulesEngineAttributesSections(variablesToUse, valuesToUse);
     }
 
     function rulesEngineAttributesSections(variables: any[], values: Record<string, any>) {
@@ -54,7 +55,7 @@ export const CustomDhis2RulesEngine = (props: RulesEngineProps) => {
                 return applyRulesToVariable(copy, values);
             })
         }));
-        setUpdatedVariables(updated);
+        // setUpdatedVariables(updated);
     }
 
     function rulesEngineSections(variables: any[], values: Record<string, any>) {
@@ -65,7 +66,8 @@ export const CustomDhis2RulesEngine = (props: RulesEngineProps) => {
                 return applyRulesToVariable(copy, values);
             })
         }));
-        setUpdatedVariables(updated);
+        return updated
+        // setUpdatedVariables(updated);
     }
 
     function rulesEngineDataElements(variables: any[], values: Record<string, any>) {
@@ -73,7 +75,9 @@ export const CustomDhis2RulesEngine = (props: RulesEngineProps) => {
             const copy = { ...variable };
             return applyRulesToVariable(copy, values);
         });
-        setUpdatedVariables(updated);
+        return updated
+
+        // setUpdatedVariables(updated);
     }
 
 
@@ -172,7 +176,7 @@ export const CustomDhis2RulesEngine = (props: RulesEngineProps) => {
     function applyRulesToVariable(variable: any, values: Record<string, any>) {
         for (const rule of newProgramRules.filter(x => x.variable === variable.id)) {
             const conditionResult = evaluateExpression(rule.condition, variable, values, programRulesVariables);
-
+console.log(rule)
             switch (rule.programRuleActionType) {
                 case "ASSIGN":
                     if (conditionResult) {
@@ -202,7 +206,7 @@ export const CustomDhis2RulesEngine = (props: RulesEngineProps) => {
                     break;
 
                 case "HIDEFIELD":
-                    variable.visible = !conditionResult;
+                    variable.disabled = !!conditionResult;
                     break;
 
                 case "HIDEOPTIONGROUP":
@@ -228,6 +232,6 @@ export const CustomDhis2RulesEngine = (props: RulesEngineProps) => {
 
     return {
         runRulesEngine,
-        updatedVariables
+        // updatedVariables
     };
 };

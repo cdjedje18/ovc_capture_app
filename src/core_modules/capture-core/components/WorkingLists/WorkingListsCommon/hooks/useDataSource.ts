@@ -17,6 +17,7 @@ import {
 import { InlineEventCellField } from './InlineEventCellField.component';
 import { MEMBERS_CAPTURE_LINK_COLUMN_ID } from '../../TrackerWorkingLists/Setup/hooks/useDefaultColumnConfig';
 import { getFilterApiName } from '../../TrackerWorkingLists/helpers';
+import { CustomDhis2RulesEngine } from 'capture-core/components/Pages/MembersFormPage/hooks/programRules/rules-engine/RulesEngine';
 
 const TRACKER_EVENT_MUTATION: Mutation = {
     resource: 'tracker?async=false&importStrategy=CREATE_AND_UPDATE',
@@ -84,7 +85,7 @@ const hasEventForSelectedDate = ({
     selectedMembersVisitDate?: string,
     occurredAt?: string,
 }) => !isMembersFormPage
-    || !selectedMembersVisitDate
+|| !selectedMembersVisitDate
     || getOccurredAtDate(occurredAt) === selectedMembersVisitDate;
 
 const getEventMetadata = (eventRecord: { [key: string]: any }) => ({
@@ -298,35 +299,46 @@ export const useDataSource = (
 
         return fetchedSelectedDateEventsByTei;
     }, [fetchedSelectedDateEventsByTei, isMembersFormPage, selectedMembersVisitDate]);
+
+    const { runRulesEngine/*, updatedVariables*/ } = CustomDhis2RulesEngine({
+        program: "pVgO58r40Au",
+        type: "programStage",
+    })
+
     const eventRecordsArray = useMemo(() =>
         recordsOrder && records && recordsOrder
-            .map(id => ({
-                ...records[id],
-                ...(isMembersFormPage && selectedMembersVisitDate && selectedDateEventsByTei ? (() => {
-                    const selectedDateEvent = selectedDateEventsByTei[records[id]?.[EVENT_METADATA_KEYS.teiId] || id];
-                    const selectedDateEventValues = (selectedDateEvent?.dataValues || []).reduce((acc, dataValue) => {
-                        acc[dataValue.dataElement] = dataValue.value;
-                        return acc;
-                    }, {});
-
-                    return columns
-                        .filter(column => column.additionalColumn)
-                        .reduce((acc, column) => {
-                            const rawValue = column.mainProperty
-                                ? selectedDateEvent?.[getFilterApiName(column.id)]
-                                : selectedDateEventValues[column.id];
-
-                            acc[column.id] = rawValue == null ? undefined : convertServerToClient(rawValue, column.type);
+            .map(id => {
+                const data = {
+                    ...records[id],
+                    ...(isMembersFormPage && selectedMembersVisitDate && selectedDateEventsByTei ? (() => {
+                        const selectedDateEvent = selectedDateEventsByTei[records[id]?.[EVENT_METADATA_KEYS.teiId] || id];
+                        const selectedDateEventValues = (selectedDateEvent?.dataValues || []).reduce((acc, dataValue) => {
+                            acc[dataValue.dataElement] = dataValue.value;
                             return acc;
-                        }, {
-                            [EVENT_METADATA_KEYS.eventId]: selectedDateEvent?.event,
-                            [EVENT_METADATA_KEYS.occurredAt]: selectedDateEvent?.occurredAt,
-                            [EVENT_METADATA_KEYS.syntheticForSelectedDate]: false,
-                        });
-                })() : {}),
-                ...((recordOverrides[activeOverrideScopeKey] || {})[id] || {}),
-                id,
-            })), [
+                        }, {});
+
+                        return columns
+                            .filter(column => column.additionalColumn)
+                            .reduce((acc, column) => {
+                                const rawValue = column.mainProperty
+                                    ? selectedDateEvent?.[getFilterApiName(column.id)]
+                                    : selectedDateEventValues[column.id];
+
+                                acc[column.id] = rawValue == null ? undefined : convertServerToClient(rawValue, column.type);
+                                // runRulesEngine({overrideValues:[],overrideVariables:[]})
+                                return acc;
+                            }, {
+                                [EVENT_METADATA_KEYS.eventId]: selectedDateEvent?.event,
+                                [EVENT_METADATA_KEYS.occurredAt]: selectedDateEvent?.occurredAt,
+                                [EVENT_METADATA_KEYS.syntheticForSelectedDate]: false,
+                            });
+                    })() : {}),
+                    ...((recordOverrides[activeOverrideScopeKey] || {})[id] || {}),
+                    id,
+                }
+                // console.log(data, 'the dara')
+                return data
+            }), [
         records,
         recordsOrder,
         recordOverrides,
@@ -566,6 +578,8 @@ export const useDataSource = (
     return useMemo(() => eventRecordsArray && eventRecordsArray
         .map((eventRecord) => {
             const activeRowOverride = ((recordOverrides[activeOverrideScopeKey] || {})[eventRecord.id] || {});
+            const headers = runRulesEngine({ overrideValues: eventRecord, overrideVariables: columns })
+
             const listRecord = columns
                 .filter(column => column.visible)
                 .reduce((acc, column) => {
@@ -583,6 +597,7 @@ export const useDataSource = (
                         )
                         && (column.additionalColumn || column.mainProperty);
                     const clientValue = shouldBlankEventValue ? undefined : eventRecord[id];
+
                     if (isMembersFormPage && id === MEMBERS_CAPTURE_LINK_COLUMN_ID) {
                         const captureEnrollmentUrl = getCaptureEnrollmentUrl({
                             baseUrl,
@@ -607,11 +622,13 @@ export const useDataSource = (
                     }
 
                     if (isMembersFormPage && column.additionalColumn) {
+                        const thisHeader = headers?.find(x => x.id == column.id)
+
                         acc[id] = React.createElement(InlineEventCellField, {
                             key: `${eventRecord.id}-${id}`,
-                            column,
+                            column: thisHeader,
                             value: clientValue,
-                            disabled: isMembersFormLocked,
+                            ...(isMembersFormLocked ? { disabled: isMembersFormLocked } : {}),
                             saveStatus: fieldSaveStatusById[getFieldSaveStatusKey(eventRecord.id, id)] || 'idle',
                             onCommit: (nextClientValue: any) => {
                                 void persistEventCellValue({
@@ -638,7 +655,7 @@ export const useDataSource = (
                                 log.error(
                                     errorCreator(
                                         'Missing value in options')(
-                                        { id, clientValue, options }),
+                                            { id, clientValue, options }),
                                 );
                                 acc[id] = convertClientToList(clientValue, type);
                             } else {

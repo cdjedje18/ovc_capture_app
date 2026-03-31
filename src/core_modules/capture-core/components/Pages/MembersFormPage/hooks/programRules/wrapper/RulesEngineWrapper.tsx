@@ -12,13 +12,13 @@ export default function RulesEngineWrapper(props: RulesEngineWrapperProps) {
     const { programs } = props;
     const { loading, error } = FetchEngineVariables(programs)
 
-    if (loading) {
-        return (
-            <Center>
-                <CircularLoader />
-            </Center>
-        )
-    }
+    // if (loading) {
+    //     return (
+    //         <Center>
+    //             <CircularLoader />
+    //         </Center>
+    //     )
+    // }
 
     if (error) {
         return (

@@ -65,7 +65,7 @@
         "zod": "^3.24.4"
     },
     "scripts": {
-        "start": "d2-app-scripts start --proxy https://kudufly.com/ovc",
+        "start": "d2-app-scripts start --proxy https://sb.anda.org.mz",
         "start:prod": "yarn build:standalone && serve -s build/app",
         "start:forCypress": "yarn build:standalone && node scripts/startAppForCypress.js",
         "build": "yarn verifyCacheVersion && yarn workspaces run build && GENERATE_SOURCEMAP=false d2-app-scripts build && cp ./package.json ./build/app/package.json",
