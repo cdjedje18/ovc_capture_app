@@ -5,6 +5,8 @@ import { TopBar } from './TopBar/TopBar.container';
 import { MembersFormPageBody } from './MembersFormPageBody';
 import type { MainPageComponentProps } from './membersFormPage.types';
 import { MainPageStatuses } from './shared/constants';
+import { RulesEngineWrapper } from './hooks/programRules';
+import { RecoilRoot } from 'recoil';
 
 const styles = {
     containerBulkDataEntry: {
@@ -48,21 +50,28 @@ const MainPageComponentPlain = ({
             orgUnitId={orgUnitId}
             selectedCategories={selectedCategories}
         />
-        <MembersFormPageBody
-            mainPageStatus={mainPageStatus}
-            programId={programId || ''}
-            orgUnitId={orgUnitId}
-            trackedEntityTypeId={trackedEntityTypeId}
-            selectedTemplateId={selectedTemplateId}
-            setShowAccessible={onSetShowAccessible}
-            onChangeTemplate={onChangeTemplate}
-            error={error || false}
-            ready={ready}
-            displayFrontPageList={displayFrontPageList}
-            onCloseBulkDataEntryPlugin={onCloseBulkDataEntryPlugin}
-            onOpenBulkDataEntryPlugin={onOpenBulkDataEntryPlugin}
-            bulkDataEntryTrackedEntityIds={bulkDataEntryTrackedEntityIds}
-        />
+        <RecoilRoot>
+            <RulesEngineWrapper
+                children={
+                    <MembersFormPageBody
+                        mainPageStatus={mainPageStatus}
+                        programId={programId || ''}
+                        orgUnitId={orgUnitId}
+                        trackedEntityTypeId={trackedEntityTypeId}
+                        selectedTemplateId={selectedTemplateId}
+                        setShowAccessible={onSetShowAccessible}
+                        onChangeTemplate={onChangeTemplate}
+                        error={error || false}
+                        ready={ready}
+                        displayFrontPageList={displayFrontPageList}
+                        onCloseBulkDataEntryPlugin={onCloseBulkDataEntryPlugin}
+                        onOpenBulkDataEntryPlugin={onOpenBulkDataEntryPlugin}
+                        bulkDataEntryTrackedEntityIds={bulkDataEntryTrackedEntityIds}
+                    />
+                }
+                programs={[programId]}
+            />
+        </RecoilRoot>
     </div>
 );
 
