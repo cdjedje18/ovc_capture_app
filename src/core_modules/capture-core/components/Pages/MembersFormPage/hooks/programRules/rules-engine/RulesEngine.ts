@@ -11,10 +11,11 @@ interface RulesEngineProps {
     values?: Record<string, any>
     type: "programStage" | "programStageSection" | "attributesSection"
     program: string,
+    rowChanged: string,
 }
 
 export const CustomDhis2RulesEngine = (props: RulesEngineProps) => {
-    const { type, program } = props;
+    const { type, program, rowChanged } = props;
     const getOptionGroups = useRecoilValue(OptionGroupsConfigState);
     const orgUnitsGroups = useRecoilValue(OrgUnitsGroupsConfigState);
     const { programRulesVariables } = useFormatProgramRulesVariables(program);
@@ -176,15 +177,16 @@ export const CustomDhis2RulesEngine = (props: RulesEngineProps) => {
     function applyRulesToVariable(variable: any, values: Record<string, any>) {
         for (const rule of newProgramRules.filter(x => x.variable === variable.id)) {
             const conditionResult = evaluateExpression(rule.condition, variable, values, programRulesVariables);
-console.log(rule)
+
             switch (rule.programRuleActionType) {
                 case "ASSIGN":
                     if (conditionResult) {
                         const newValue = evaluateExpression(rule.data, variable, values, programRulesVariables);
                         values[variable.id] = newValue ?? "";
                         variable["value"] = newValue
-                    }
+                    } else variable["value"] = null
                     variable.disabled = true;
+                    variable.rowChanged = rowChanged
                     break;
 
                 case "SHOWOPTIONGROUP":

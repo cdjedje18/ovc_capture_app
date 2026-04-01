@@ -14,9 +14,11 @@ type Props = {
         type: string;
         options?: Array<{ text: string, value: any }> | null;
         disabled?: boolean
+        value?: any
+        rowChanged?: string
     };
     value: any;
-    onCommit: (value: any) => void;
+    onCommit: (value: any, handledByRule?: boolean) => void;
     disabled?: boolean;
     saveStatus?: 'idle' | 'saving' | 'success' | 'error';
 };
@@ -106,6 +108,12 @@ export const InlineEventCellField = React.memo(({
         setLocalValue(value ?? null);
     }, [value, column.id]);
 
+    useEffect(() => {
+        if (column.value !== value && column?.rowChanged && column?.rowChanged?.length > 0) {
+            onCommit(column?.value, true)
+        }
+    }, [column.value])
+
     const optionSetOptions = useMemo(
         () => (column.options || []).map(option => ({
             value: option.value,
@@ -168,6 +176,7 @@ export const InlineEventCellField = React.memo(({
         : null;
 
     if (column.options && column.type !== dataElementTypes.MULTI_TEXT) {
+
         return (
             <div style={commonStyle}>
                 <SingleSelectField

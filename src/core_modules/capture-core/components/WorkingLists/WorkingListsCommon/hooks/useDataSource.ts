@@ -281,6 +281,7 @@ export const useDataSource = (
     } = useDataQuery(SELECTED_DATE_EVENTS_QUERY, { lazy: true });
     const [saveEventMutation] = useDataMutation(TRACKER_EVENT_MUTATION);
     const [recordOverrides, setRecordOverrides] = useState<{ [key: string]: { [key: string]: any } }>({});
+    const [rowChanged, setRowChanged] = useState<string>('');
     const [fieldSaveStatusById, setFieldSaveStatusById] = useState<Record<string, 'idle' | 'saving' | 'success' | 'error'>>({});
     const fieldSaveTimeoutsRef = useRef<Record<string, number>>({});
     const activeOverrideScopeKey = getOverrideScopeKey({
@@ -300,10 +301,7 @@ export const useDataSource = (
         return fetchedSelectedDateEventsByTei;
     }, [fetchedSelectedDateEventsByTei, isMembersFormPage, selectedMembersVisitDate]);
 
-    const { runRulesEngine/*, updatedVariables*/ } = CustomDhis2RulesEngine({
-        program: "pVgO58r40Au",
-        type: "programStage",
-    })
+    const { runRulesEngine/*, updatedVariables*/ } = isMembersFormPage ? CustomDhis2RulesEngine({ program: "pVgO58r40Au", type: "programStage", rowChanged }) : {}
 
     const eventRecordsArray = useMemo(() =>
         recordsOrder && records && recordsOrder
@@ -397,16 +395,22 @@ export const useDataSource = (
         eventRecord,
         column,
         nextClientValue,
+        handledByRule
     }: {
         eventRecord: { [key: string]: any },
         column: { id: string, type: keyof typeof dataElementTypes },
         nextClientValue: any,
+        handledByRule?: boolean
     }) => {
+        const rowId = eventRecord.id
+        setRowChanged(rowId)
+
         const existingClientValue = eventRecord[column.id];
-        if (existingClientValue === nextClientValue) {
+        if (existingClientValue === nextClientValue && !handledByRule) {
             return;
         }
-        if (isMembersFormPage && !selectedMembersVisitDate) {
+
+        if (isMembersFormPage && !selectedMembersVisitDate && !handledByRule) {
             return;
         }
 
@@ -456,7 +460,6 @@ export const useDataSource = (
             existingOccurredAt: targetExistingOccurredAt,
             selectedMembersVisitDate,
         });
-        const rowId = eventRecord.id;
 
         if (targetExistingEventId && !nextOccurredAt) {
             log.warn(
@@ -524,8 +527,7 @@ export const useDataSource = (
             });
         }, 5000);
 
-        setRecordOverrides(currentOverrides =>
-            applyRecordOverridePatch(currentOverrides, overrideScopeKey, rowId, overridePatch));
+        setRecordOverrides(currentOverrides => applyRecordOverridePatch(currentOverrides, overrideScopeKey, rowId, overridePatch));
 
         try {
             const mutationResponse = await saveEventMutation({
@@ -573,12 +575,13 @@ export const useDataSource = (
             eventRecord[EVENT_METADATA_KEYS.occurredAt] = nextOccurredAt;
             eventRecord[EVENT_METADATA_KEYS.syntheticForSelectedDate] = true;
         }
+        setRowChanged('')
     }, [currentProgramStageId, isMembersFormPage, saveEventMutation, selectedMembersVisitDate]);
 
     return useMemo(() => eventRecordsArray && eventRecordsArray
         .map((eventRecord) => {
             const activeRowOverride = ((recordOverrides[activeOverrideScopeKey] || {})[eventRecord.id] || {});
-            const headers = runRulesEngine({ overrideValues: eventRecord, overrideVariables: columns })
+            const headers = isMembersFormPage ? runRulesEngine({ overrideValues: eventRecord, overrideVariables: columns }) : columns
 
             const listRecord = columns
                 .filter(column => column.visible)
@@ -630,11 +633,12 @@ export const useDataSource = (
                             value: clientValue,
                             ...(isMembersFormLocked ? { disabled: isMembersFormLocked } : {}),
                             saveStatus: fieldSaveStatusById[getFieldSaveStatusKey(eventRecord.id, id)] || 'idle',
-                            onCommit: (nextClientValue: any) => {
+                            onCommit: (nextClientValue: any, handledByRule?: boolean) => {
                                 void persistEventCellValue({
                                     eventRecord,
                                     column,
                                     nextClientValue,
+                                    handledByRule
                                 });
                             },
                         });
