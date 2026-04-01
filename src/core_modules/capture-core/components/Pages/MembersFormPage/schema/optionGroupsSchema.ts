@@ -1,4 +1,4 @@
-import { atom } from "recoil"
+import { atom } from 'recoil';
 
 export interface OptionGroupsConfig {
     id: string
@@ -9,6 +9,6 @@ export interface OptionGroupsConfig {
 }
 
 export const OptionGroupsConfigState = atom<OptionGroupsConfig[]>({
-    key: "optionGroupsConfig-get",
-    default: []
-})
+    key: 'optionGroupsConfig-get',
+    default: [],
+});

@@ -1,4 +1,4 @@
-import { atom } from "recoil";
+import { atom } from 'recoil';
 
 // Reusable small pieces
 interface IdObject {
@@ -78,6 +78,6 @@ export interface UserInfo {
 }
 
 export const UserInfoState = atom<UserInfo>({
-    key: "userInfo-store",
+    key: 'userInfo-store',
     default: {} as unknown as UserInfo,
-})
+});

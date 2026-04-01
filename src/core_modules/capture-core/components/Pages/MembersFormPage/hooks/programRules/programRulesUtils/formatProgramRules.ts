@@ -1,5 +1,5 @@
-import { ProgramRuleConfig, ProgramRuleVariableConfig } from "../../../types/programRules/ProgramRulesTypes";
-import { FormattedPRulesType, PRulesTypes } from "../../../types/programRules/FormattedPRules";
+import { ProgramRuleConfig, ProgramRuleVariableConfig } from '../../../types/programRules/ProgramRulesTypes';
+import { FormattedPRulesType, PRulesTypes } from '../../../types/programRules/FormattedPRules';
 
 
 export function formatProgramRules(programRules: ProgramRuleConfig[]): FormattedPRulesType[] {
@@ -17,8 +17,8 @@ export function formatProgramRules(programRules: ProgramRuleConfig[]): Formatted
                 optionGroup: pRulesAction?.optionGroup?.id,
                 displayName: pRulesAction?.displayName,
                 id: pRulesAction?.id,
-                program: prules?.program?.id
-            })
+                program: prules?.program?.id,
+            });
         }
     }
 
@@ -29,8 +29,7 @@ export function formatProgramRuleVariables(programRuleVariables: ProgramRuleVari
     const programRuleVariablesResponses: Record<string, string | undefined> = {};
 
     for (const pRulesVariable of programRuleVariables || []) {
-        if(pRulesVariable.program.id === program)
-        programRuleVariablesResponses[pRulesVariable?.name.trim()] = pRulesVariable?.dataElement?.id || pRulesVariable?.trackedEntityAttribute?.id
+        if (pRulesVariable.program.id === program) { programRuleVariablesResponses[pRulesVariable?.name.trim()] = pRulesVariable?.dataElement?.id || pRulesVariable?.trackedEntityAttribute?.id; }
     }
 
     return programRuleVariablesResponses;

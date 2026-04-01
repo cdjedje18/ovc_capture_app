@@ -17,9 +17,9 @@ import { isMembersFormPage as isMembersFormPageRoute } from '../../../WorkingLis
 
 const dataStoreQuery = {
     results: {
-        resource: "dataStore/ovc_capture_app/programs"
+        resource: 'dataStore/ovc_capture_app/programs',
     },
-}
+};
 
 const styles = () => ({
     selectBarMenu: {
@@ -77,27 +77,26 @@ const ProgramSelectorPlain = ({
 
     const programsDataStoreQuery = useDataQuery(dataStoreQuery, {
         lazy: true,
-        onComplete: function (params) {
+        onComplete(params) {
             // console.log({ params })
             const masterPrograms = (params as Params)?.results?.masterPrograms;
             const masterProgramsCollection = new Map(masterPrograms?.map(item => [item.id, item]));
             // console.log(masterProgramsCollection)
-            const programs = Array.from(programCollection.values())
+            const programs = Array.from(programCollection.values());
             const displayedProgramas = programs.filter(item =>
-                masterProgramsCollection.has(item._id)
+                masterProgramsCollection.has(item._id),
             );
             // console.log(displayedProgramas)
             setProgramsArray(displayedProgramas);
-        }
-    })
+        },
+    });
 
     useEffect(() => {
         // setProgramsArray(Array.from(programCollection.values()));
 
         if (!selectedProgramId) {
-            programsDataStoreQuery.refetch()
+            programsDataStoreQuery.refetch();
         }
-
     }, []);
 
     const renderCategories = () => {
@@ -120,7 +119,6 @@ const ProgramSelectorPlain = ({
         }
         return null;
     };
-
 
 
     return (

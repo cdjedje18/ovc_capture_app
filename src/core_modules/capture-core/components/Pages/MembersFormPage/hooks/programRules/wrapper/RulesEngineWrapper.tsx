@@ -1,6 +1,6 @@
-import React, { Fragment } from 'react'
+import React, { Fragment } from 'react';
 import FetchEngineVariables from './FetchEngineVariables';
-import { Center, CircularLoader, NoticeBox } from "@dhis2/ui";
+import { Center, CircularLoader, NoticeBox } from '@dhis2/ui';
 import { RulesEngineWrapperProps } from '../../../types/programRules/RulesEngineProps';
 
 /**
@@ -10,7 +10,7 @@ import { RulesEngineWrapperProps } from '../../../types/programRules/RulesEngine
  */
 export default function RulesEngineWrapper(props: RulesEngineWrapperProps) {
     const { programs } = props;
-    const { loading, error } = FetchEngineVariables(programs)
+    const { loading, error } = FetchEngineVariables(programs);
 
     // if (loading) {
     //     return (
@@ -30,12 +30,12 @@ export default function RulesEngineWrapper(props: RulesEngineWrapperProps) {
                     Something went wrong loading the app program rules. Check if your app is already configured.
                 </NoticeBox>
             </Center>
-        )
+        );
     }
 
     return (
         <Fragment>
             {props.children}
         </Fragment>
-    )
+    );
 }

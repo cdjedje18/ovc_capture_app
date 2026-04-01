@@ -1,4 +1,4 @@
-import { atom } from "recoil"
+import { atom } from 'recoil';
 
 export interface OrgUnitsGroupsConfig {
     value: string,
@@ -10,6 +10,6 @@ export interface OrgUnitsGroupsConfig {
 }
 
 export const OrgUnitsGroupsConfigState = atom<OrgUnitsGroupsConfig[]>({
-    key: "orgUnitGroupsConfig-get-state",
-    default: []
-})
+    key: 'orgUnitGroupsConfig-get-state',
+    default: [],
+});

@@ -17,6 +17,5 @@ export default function FetchEngineVariables(programs: string[]) {
     return {
         error: errorPRules || errorOptionGroups || errorOrgUnitsGroups || errorPRulesVariables,
         loading: loadingPRules || loadingPRulesVariables || loadingOptionGroups || loadingOrgUnitsGroups,
-    }
-
+    };
 }

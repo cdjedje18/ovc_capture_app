@@ -2,7 +2,7 @@ interface FormattedPRulesType {
     condition?: string
     programRuleActionType?: string
     variable?: string
-    type?: PRulesTypes | undefined | ""
+    type?: PRulesTypes | undefined | ''
     content?: string | undefined
     programStage?: string | undefined
     data?: string | undefined
@@ -15,8 +15,8 @@ interface FormattedPRulesType {
 
 export enum PRulesTypes {
     DATA_ELEMENT = 'dataElement',
-    ATTRIBUTE = "attribute",
-    SECTION = "section"
+    ATTRIBUTE = 'attribute',
+    SECTION = 'section'
 }
 
-export type { FormattedPRulesType }
+export type { FormattedPRulesType };

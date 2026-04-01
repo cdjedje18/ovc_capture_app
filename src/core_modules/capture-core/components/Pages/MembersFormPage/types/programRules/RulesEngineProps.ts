@@ -1,10 +1,10 @@
-import { CustomAttributeProps, GroupFormProps } from "dhis2-semis-types"
+import { CustomAttributeProps, GroupFormProps } from 'dhis2-semis-types';
 
 /** A group of valid program rules types to specify the implementation. */
 export enum RulesType {
-    ProgramStage = "ProgramStage",
-    AttributesSection = "AttributesSection",
-    ProgramStageSection = "ProgramStageSection",
+    ProgramStage = 'ProgramStage',
+    AttributesSection = 'AttributesSection',
+    ProgramStageSection = 'ProgramStageSection',
 }
 
 /**
@@ -59,4 +59,4 @@ interface RulesEngineWrapperProps {
     children: React.ReactNode,
 }
 
-export type { RulesEngineProps, RulesEngineWrapperProps }
+export type { RulesEngineProps, RulesEngineWrapperProps };

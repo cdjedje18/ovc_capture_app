@@ -46,4 +46,4 @@ interface ProgramRuleVariableConfig {
     }
 }
 
-export type { ProgramRuleConfig, ProgramRuleAction, ProgramRuleVariableConfig }
+export type { ProgramRuleConfig, ProgramRuleAction, ProgramRuleVariableConfig };

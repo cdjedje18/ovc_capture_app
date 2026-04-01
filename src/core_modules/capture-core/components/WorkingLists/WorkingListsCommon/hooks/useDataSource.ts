@@ -301,11 +301,11 @@ export const useDataSource = (
         return fetchedSelectedDateEventsByTei;
     }, [fetchedSelectedDateEventsByTei, isMembersFormPage, selectedMembersVisitDate]);
 
-    const { runRulesEngine/*, updatedVariables*/ } = isMembersFormPage ? CustomDhis2RulesEngine({ program: "pVgO58r40Au", type: "programStage", rowChanged }) : {}
+    const { runRulesEngine/* , updatedVariables */ } = isMembersFormPage ? CustomDhis2RulesEngine({ program: 'pVgO58r40Au', type: 'programStage', rowChanged }) : {};
 
     const eventRecordsArray = useMemo(() =>
         recordsOrder && records && recordsOrder
-            .map(id => {
+            .map((id) => {
                 const data = {
                     ...records[id],
                     ...(isMembersFormPage && selectedMembersVisitDate && selectedDateEventsByTei ? (() => {
@@ -333,9 +333,9 @@ export const useDataSource = (
                     })() : {}),
                     ...((recordOverrides[activeOverrideScopeKey] || {})[id] || {}),
                     id,
-                }
+                };
                 // console.log(data, 'the dara')
-                return data
+                return data;
             }), [
         records,
         recordsOrder,
@@ -395,15 +395,15 @@ export const useDataSource = (
         eventRecord,
         column,
         nextClientValue,
-        handledByRule
+        handledByRule,
     }: {
         eventRecord: { [key: string]: any },
         column: { id: string, type: keyof typeof dataElementTypes },
         nextClientValue: any,
         handledByRule?: boolean
     }) => {
-        const rowId = eventRecord.id
-        setRowChanged(rowId)
+        const rowId = eventRecord.id;
+        setRowChanged(rowId);
 
         const existingClientValue = eventRecord[column.id];
         if (existingClientValue === nextClientValue && !handledByRule) {
@@ -575,13 +575,13 @@ export const useDataSource = (
             eventRecord[EVENT_METADATA_KEYS.occurredAt] = nextOccurredAt;
             eventRecord[EVENT_METADATA_KEYS.syntheticForSelectedDate] = true;
         }
-        setRowChanged('')
+        setRowChanged('');
     }, [currentProgramStageId, isMembersFormPage, saveEventMutation, selectedMembersVisitDate]);
 
     return useMemo(() => eventRecordsArray && eventRecordsArray
         .map((eventRecord) => {
             const activeRowOverride = ((recordOverrides[activeOverrideScopeKey] || {})[eventRecord.id] || {});
-            const headers = isMembersFormPage ? runRulesEngine!({ overrideValues: eventRecord, overrideVariables: columns }) : columns
+            const headers = isMembersFormPage ? runRulesEngine!({ overrideValues: eventRecord, overrideVariables: columns }) : columns;
 
             const listRecord = columns
                 .filter(column => column.visible)
@@ -625,7 +625,7 @@ export const useDataSource = (
                     }
 
                     if (isMembersFormPage && column.additionalColumn) {
-                        const thisHeader = headers?.find(x => x.id == column.id)
+                        const thisHeader = headers?.find(x => x.id == column.id);
 
                         acc[id] = React.createElement(InlineEventCellField, {
                             key: `${eventRecord.id}-${id}`,
@@ -638,7 +638,7 @@ export const useDataSource = (
                                     eventRecord,
                                     column,
                                     nextClientValue,
-                                    handledByRule
+                                    handledByRule,
                                 });
                             },
                         });
@@ -659,7 +659,7 @@ export const useDataSource = (
                                 log.error(
                                     errorCreator(
                                         'Missing value in options')(
-                                            { id, clientValue, options }),
+                                        { id, clientValue, options }),
                                 );
                                 acc[id] = convertClientToList(clientValue, type);
                             } else {

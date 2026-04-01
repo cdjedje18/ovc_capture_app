@@ -42,18 +42,18 @@ const isValidNumericDraft = (value: string, type: string) => {
     }
 
     switch (type) {
-        case dataElementTypes.NUMBER:
-            return /^-?\d*(?:[.]\d*)?$/.test(value);
-        case dataElementTypes.INTEGER:
-            return /^-?\d*$/.test(value);
-        case dataElementTypes.INTEGER_POSITIVE:
-            return /^\d*$/.test(value) && value !== '0';
-        case dataElementTypes.INTEGER_NEGATIVE:
-            return /^-\d*$/.test(value);
-        case dataElementTypes.INTEGER_ZERO_OR_POSITIVE:
-            return /^\d*$/.test(value);
-        default:
-            return true;
+    case dataElementTypes.NUMBER:
+        return /^-?\d*(?:[.]\d*)?$/.test(value);
+    case dataElementTypes.INTEGER:
+        return /^-?\d*$/.test(value);
+    case dataElementTypes.INTEGER_POSITIVE:
+        return /^\d*$/.test(value) && value !== '0';
+    case dataElementTypes.INTEGER_NEGATIVE:
+        return /^-\d*$/.test(value);
+    case dataElementTypes.INTEGER_ZERO_OR_POSITIVE:
+        return /^\d*$/.test(value);
+    default:
+        return true;
     }
 };
 
@@ -67,18 +67,18 @@ const isValidNumericCommit = (value: string, type: string) => {
     }
 
     switch (type) {
-        case dataElementTypes.NUMBER:
-            return /^-?\d+(?:[.]\d+)?$/.test(value);
-        case dataElementTypes.INTEGER:
-            return /^-?\d+$/.test(value);
-        case dataElementTypes.INTEGER_POSITIVE:
-            return /^[1-9]\d*$/.test(value);
-        case dataElementTypes.INTEGER_NEGATIVE:
-            return /^-\d+$/.test(value);
-        case dataElementTypes.INTEGER_ZERO_OR_POSITIVE:
-            return /^\d+$/.test(value) || value === '0';
-        default:
-            return true;
+    case dataElementTypes.NUMBER:
+        return /^-?\d+(?:[.]\d+)?$/.test(value);
+    case dataElementTypes.INTEGER:
+        return /^-?\d+$/.test(value);
+    case dataElementTypes.INTEGER_POSITIVE:
+        return /^[1-9]\d*$/.test(value);
+    case dataElementTypes.INTEGER_NEGATIVE:
+        return /^-\d+$/.test(value);
+    case dataElementTypes.INTEGER_ZERO_OR_POSITIVE:
+        return /^\d+$/.test(value) || value === '0';
+    default:
+        return true;
     }
 };
 
@@ -110,9 +110,9 @@ export const InlineEventCellField = React.memo(({
 
     useEffect(() => {
         if (column.value !== value && column?.rowChanged && column?.rowChanged?.length > 0) {
-            onCommit(column?.value, true)
+            onCommit(column?.value, true);
         }
-    }, [column.value])
+    }, [column.value]);
 
     const optionSetOptions = useMemo(
         () => (column.options || []).map(option => ({
@@ -176,7 +176,6 @@ export const InlineEventCellField = React.memo(({
         : null;
 
     if (column.options && column.type !== dataElementTypes.MULTI_TEXT) {
-
         return (
             <div style={commonStyle}>
                 <SingleSelectField
@@ -202,7 +201,8 @@ export const InlineEventCellField = React.memo(({
                     options={optionSetOptions}
                     value={multiValue}
                     onSelect={commit}
-                    disabled={disabled || column?.disabled} />
+                    disabled={disabled || column?.disabled}
+                />
                 {statusNode}
             </div>
         );

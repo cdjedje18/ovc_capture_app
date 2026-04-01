@@ -60,7 +60,6 @@ const TableHeaderTabsSelectorPlain = ({ classes, programId }: Props & OwnProps) 
     const handleTabClick = React.useCallback((sectionId: string) => {
         setActiveTab(sectionId);
         setSelectedMembersSection(currentProgramStage, sectionId);
-
     }, [currentProgramStage]);
 
     if (!sectionsFromProgramStage.length) {

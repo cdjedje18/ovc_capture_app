@@ -14,7 +14,7 @@ import { withStyles, type WithStyles } from 'capture-core-utils/styles';
 import type { ReactNode } from 'react';
 import type { OptionSet } from '../../../metaData';
 import { dataElementTypes } from '../../../metaData';
-import { withRouter, RouteComponentProps } from "react-router-dom";
+import { withRouter, RouteComponentProps } from 'react-router-dom';
 import { buildUrlQueryString } from 'capture-core/utils/routing';
 import { withApiUtils } from '../../../HOC';
 
