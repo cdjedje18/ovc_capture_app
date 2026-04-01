@@ -581,7 +581,7 @@ export const useDataSource = (
     return useMemo(() => eventRecordsArray && eventRecordsArray
         .map((eventRecord) => {
             const activeRowOverride = ((recordOverrides[activeOverrideScopeKey] || {})[eventRecord.id] || {});
-            const headers = isMembersFormPage ? runRulesEngine({ overrideValues: eventRecord, overrideVariables: columns }) : columns
+            const headers = isMembersFormPage ? runRulesEngine!({ overrideValues: eventRecord, overrideVariables: columns }) : columns
 
             const listRecord = columns
                 .filter(column => column.visible)
