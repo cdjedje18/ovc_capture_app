@@ -132,11 +132,15 @@ const getOccurredAtWithCurrentTime = (selectedDate?: string) => {
         return now.format('YYYY-MM-DDTHH:mm:ss.SSS');
     }
 
-    const normalizedDate = selectedDate.slice(0, 10);
-    return moment(
-        `${normalizedDate}T${now.format('HH:mm:ss.SSS')}`,
-        'YYYY-MM-DDTHH:mm:ss.SSS',
-    ).format('YYYY-MM-DDTHH:mm:ss.SSS');
+    const date = moment(selectedDate, ['DD-MM-YYYY', 'YYYY-MM-DD'], true);
+
+    return date
+        .set({
+            hour: now.hour(),
+            minute: now.minute(),
+            second: now.second(),
+            millisecond: now.millisecond(),
+        }).format('YYYY-MM-DDTHH:mm:ss.SSS');
 };
 
 const getOccurredAtForSave = ({
@@ -333,7 +337,6 @@ export const useDataSource = (
                     ...((recordOverrides[activeOverrideScopeKey] || {})[id] || {}),
                     id,
                 };
-                console.log(data)
                 setRowChanged('');
                 return data;
             }), [
@@ -527,7 +530,6 @@ export const useDataSource = (
             });
         }, 5000);
 
-        // console.log(applyRecordOverridePatch(recordOverrides, overrideScopeKey, rowId, overridePatch),'update record overrides',recordOverrides)
         setRecordOverrides(currentOverrides => applyRecordOverridePatch(currentOverrides, overrideScopeKey, rowId, overridePatch));
 
         try {
