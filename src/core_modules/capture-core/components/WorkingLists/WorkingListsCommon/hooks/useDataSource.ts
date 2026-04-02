@@ -276,7 +276,7 @@ export const useDataSource = (
 ) => {
     const isMembersFormPage = isMembersFormPageRoute();
     const selectedMembersVisitDate = useSelectedMembersVisitDate();
-    const isMembersFormLocked = isMembersFormPage && !selectedMembersVisitDate;
+    const isMembersFormLocked = isMembersFormPage && !selectedMembersVisitDate?.normalized;
     const { baseUrl } = useConfig();
     const {
         refetch: refetchSelectedDateEvents,
@@ -290,7 +290,7 @@ export const useDataSource = (
     const fieldSaveTimeoutsRef = useRef<Record<string, number>>({});
     const activeOverrideScopeKey = getOverrideScopeKey({
         isMembersFormPage,
-        selectedMembersVisitDate,
+        selectedMembersVisitDate: selectedMembersVisitDate?.normalized,
     });
     const fetchedSelectedDateEventsByTei = useMemo(() => {
         const selectedDateEventsResults = selectedDateEventsData?.results as any;
@@ -298,12 +298,12 @@ export const useDataSource = (
         return getLatestEventByTrackedEntity(events);
     }, [selectedDateEventsData]);
     const selectedDateEventsByTei = useMemo(() => {
-        if (!isMembersFormPage || !selectedMembersVisitDate) {
+        if (!isMembersFormPage || !selectedMembersVisitDate?.normalized) {
             return undefined;
         }
 
         return fetchedSelectedDateEventsByTei;
-    }, [fetchedSelectedDateEventsByTei, isMembersFormPage, selectedMembersVisitDate]);
+    }, [fetchedSelectedDateEventsByTei, isMembersFormPage, selectedMembersVisitDate?.normalized]);
 
     const { runRulesEngine/* , updatedVariables */ } = isMembersFormPage ? CustomDhis2RulesEngine({ program: 'pVgO58r40Au', type: 'programStage', rowChanged }) : {};
 
@@ -312,7 +312,7 @@ export const useDataSource = (
             .map((id) => {
                 const data = {
                     ...records[id],
-                    ...(isMembersFormPage && selectedMembersVisitDate && selectedDateEventsByTei ? (() => {
+                    ...(isMembersFormPage && selectedMembersVisitDate?.normalized && selectedDateEventsByTei ? (() => {
                         const selectedDateEvent = selectedDateEventsByTei[records[id]?.[EVENT_METADATA_KEYS.teiId] || id];
                         const selectedDateEventValues = (selectedDateEvent?.dataValues || []).reduce((acc, dataValue) => {
                             acc[dataValue.dataElement] = dataValue.value;
@@ -345,7 +345,7 @@ export const useDataSource = (
         recordOverrides,
         activeOverrideScopeKey,
         isMembersFormPage,
-        selectedMembersVisitDate,
+        selectedMembersVisitDate?.normalized,
         selectedDateEventsByTei,
         columns,
     ]);
@@ -356,15 +356,15 @@ export const useDataSource = (
             return undefined;
         }
 
-        setLoadingSelectedDateEvents(Boolean(selectedMembersVisitDate && selectedDateEventsLoading));
+        setLoadingSelectedDateEvents(Boolean(selectedMembersVisitDate?.normalized && selectedDateEventsLoading));
 
         return () => {
             setLoadingSelectedDateEvents(false);
         };
-    }, [isMembersFormPage, selectedDateEventsLoading, selectedMembersVisitDate]);
+    }, [isMembersFormPage, selectedDateEventsLoading, selectedMembersVisitDate?.normalized]);
 
     React.useEffect(() => {
-        if (!isMembersFormPage || !selectedMembersVisitDate || !recordsOrder?.length || !records) {
+        if (!isMembersFormPage || !selectedMembersVisitDate?.normalized || !recordsOrder?.length || !records) {
             return;
         }
 
@@ -383,11 +383,11 @@ export const useDataSource = (
             programId,
             programStageId,
             trackedEntityIds: getJoinedTeiIds(trackedEntityIds),
-            selectedDate: selectedMembersVisitDate,
+            selectedDate: selectedMembersVisitDate?.normalized,
         });
     }, [
         isMembersFormPage,
-        selectedMembersVisitDate,
+        selectedMembersVisitDate?.normalized,
         records,
         recordsOrder,
         refetchSelectedDateEvents,
@@ -413,7 +413,7 @@ export const useDataSource = (
             return;
         }
 
-        if (isMembersFormPage && !selectedMembersVisitDate && !handledByRule) {
+        if (isMembersFormPage && !selectedMembersVisitDate?.normalized && !handledByRule) {
             return;
         }
 
@@ -429,14 +429,14 @@ export const useDataSource = (
         const programStageId = currentProgramStageId || recordProgramStageId;
         const shouldReuseExistingEvent = Boolean(eventId) && hasEventForSelectedDate({
             isMembersFormPage,
-            selectedMembersVisitDate,
+            selectedMembersVisitDate:selectedMembersVisitDate?.normalized,
             occurredAt: existingOccurredAt,
         });
         const targetExistingEventId = shouldReuseExistingEvent ? eventId : undefined;
         const targetExistingOccurredAt = shouldReuseExistingEvent ? existingOccurredAt : undefined;
         const overrideScopeKey = getOverrideScopeKey({
             isMembersFormPage,
-            selectedMembersVisitDate,
+            selectedMembersVisitDate:selectedMembersVisitDate?.normalized,
             existingOccurredAt: targetExistingOccurredAt,
         });
 
@@ -461,7 +461,7 @@ export const useDataSource = (
         const nextOccurredAt = getOccurredAtForSave({
             eventId: targetExistingEventId,
             existingOccurredAt: targetExistingOccurredAt,
-            selectedMembersVisitDate,
+            selectedMembersVisitDate:selectedMembersVisitDate?.normalized,
         });
 
         if (targetExistingEventId && !nextOccurredAt) {
@@ -578,8 +578,9 @@ export const useDataSource = (
             eventRecord[EVENT_METADATA_KEYS.occurredAt] = nextOccurredAt;
             eventRecord[EVENT_METADATA_KEYS.syntheticForSelectedDate] = true;
         }
-    }, [currentProgramStageId, isMembersFormPage, saveEventMutation, selectedMembersVisitDate]);
+    }, [currentProgramStageId, isMembersFormPage, saveEventMutation, selectedMembersVisitDate?.normalized]);
 
+    console.log(eventRecordsArray)
     return useMemo(() => eventRecordsArray && eventRecordsArray
         .map((eventRecord) => {
             const activeRowOverride = ((recordOverrides[activeOverrideScopeKey] || {})[eventRecord.id] || {});
@@ -591,7 +592,7 @@ export const useDataSource = (
                     const { id, type, options, resolveValue } = column;
                     const isSelectedDateMatch = hasEventForSelectedDate({
                         isMembersFormPage,
-                        selectedMembersVisitDate,
+                        selectedMembersVisitDate:selectedMembersVisitDate?.normalized,
                         occurredAt: eventRecord[EVENT_METADATA_KEYS.occurredAt],
                     });
                     const isSyntheticEventForSelectedDate = Boolean(eventRecord[EVENT_METADATA_KEYS.syntheticForSelectedDate]);

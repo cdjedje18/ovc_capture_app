@@ -1,6 +1,7 @@
+import moment from 'moment';
 import { useSyncExternalStore } from 'react';
 
-let state: string | undefined;
+let state: { original: string, normalized: string } | any;
 let availableDates: Array<string> = [];
 let loadingSelectedDateEvents = false;
 const listeners = new Set<() => void>();
@@ -16,15 +17,25 @@ const subscribe = (listener: () => void) => {
     };
 };
 
-export const setSelectedMembersVisitDate = (date: string | undefined) => {
-    if (state === date) {
+export const setSelectedMembersVisitDate = (
+    date: string | undefined
+) => {
+    if (!date) {
+        state = {};
+        emit();
         return;
     }
 
-    state = date;
+    const normalized = moment(date, ['DD-MM-YYYY', 'YYYY-MM-DD'], true)
+        .format('YYYY-MM-DD');
+
+    state = {
+        original: date,
+        normalized,
+    };
+
     emit();
 };
-
 export const setAvailableMembersVisitDates = (dates: Array<string>) => {
     const uniqueSortedDates = Array.from(new Set(dates.filter(Boolean))).sort((a, b) => b.localeCompare(a));
     const didChange = availableDates.length !== uniqueSortedDates.length
