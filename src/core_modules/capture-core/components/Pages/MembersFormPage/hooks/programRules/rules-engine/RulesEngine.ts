@@ -184,8 +184,9 @@ export const CustomDhis2RulesEngine = (props: RulesEngineProps) => {
                     const newValue = evaluateExpression(rule.data, variable, values, programRulesVariables);
                     values[variable.id] = newValue ?? '';
                     variable.value = newValue;
+                    variable.disabled = true;
                 } else variable.value = null;
-                variable.disabled = true;
+                
                 variable.rowChanged = rowChanged;
                 break;
 

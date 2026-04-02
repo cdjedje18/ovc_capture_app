@@ -68,7 +68,7 @@
         "start": "d2-app-scripts start --proxy https://kudufly.com/ovc",
         "start:prod": "yarn build:standalone && serve -s build/app",
         "start:forCypress": "yarn build:standalone && node scripts/startAppForCypress.js",
-        "build": "yarn verifyCacheVersion && yarn workspaces run build --no-verify && GENERATE_SOURCEMAP=false d2-app-scripts build && cp ./package.json ./build/app/package.json",
+        "build": "d2-app-scripts build --no-verify",
         "build:standalone": "yarn verifyCacheVersion && yarn workspaces run build --no-verify && GENERATE_SOURCEMAP=false d2-app-scripts build --standalone",
         "test": "yarn workspaces run build && d2-app-scripts test",
         "test:debug": "yarn workspaces run build && react-scripts --inspect-brk test --runInBand",
