@@ -18,6 +18,7 @@ import { InlineEventCellField } from './InlineEventCellField.component';
 import { MEMBERS_CAPTURE_LINK_COLUMN_ID } from '../../TrackerWorkingLists/Setup/hooks/useDefaultColumnConfig';
 import { getFilterApiName } from '../../TrackerWorkingLists/helpers';
 import { CustomDhis2RulesEngine } from 'capture-core/components/Pages/MembersFormPage/hooks/programRules/rules-engine/RulesEngine';
+import useShowAlerts from 'capture-core/components/Pages/MembersFormPage/hooks/common/useShowAlert';
 
 const TRACKER_EVENT_MUTATION: Mutation = {
     resource: 'tracker?async=false&importStrategy=CREATE_AND_UPDATE',
@@ -307,7 +308,7 @@ export const useDataSource = (
 
     const { runRulesEngine/* , updatedVariables */ } = isMembersFormPage ? CustomDhis2RulesEngine({ program: 'pVgO58r40Au', type: 'programStage', rowChanged }) : {};
     const rowValueRef = useRef({});
-    const [rowValue, setRowValue] = useState({});
+    const { hide, show } = useShowAlerts()
 
     const eventRecordsArray = useMemo(() =>
         recordsOrder && records && recordsOrder
@@ -399,25 +400,17 @@ export const useDataSource = (
     const persistEventCellValue = useCallback(async ({
         eventRecord,
         column,
+        row
     }: {
         eventRecord: { [key: string]: any },
         column: { id: string, type: keyof typeof dataElementTypes },
+        row: any
     }) => {
         const rowId = eventRecord.id;
-        setRowChanged(rowId);
 
         if (isMembersFormPage && !selectedMembersVisitDate?.normalized) return;
 
-        console.log(rowValueRef.current, rowId)
-        const {
-            eventId,
-            teiId,
-            enrollmentId,
-            orgUnitId,
-            programId,
-            programStageId: recordProgramStageId,
-            occurredAt: existingOccurredAt,
-        } = getEventMetadata(eventRecord);
+        const { eventId, teiId, enrollmentId, orgUnitId, programId, programStageId: recordProgramStageId, occurredAt: existingOccurredAt } = getEventMetadata(eventRecord);
 
         const programStageId = currentProgramStageId || recordProgramStageId;
         const shouldReuseExistingEvent = Boolean(eventId) && hasEventForSelectedDate({
@@ -427,11 +420,7 @@ export const useDataSource = (
         });
         const targetExistingEventId = shouldReuseExistingEvent ? eventId : undefined;
         const targetExistingOccurredAt = shouldReuseExistingEvent ? existingOccurredAt : undefined;
-        const overrideScopeKey = getOverrideScopeKey({
-            isMembersFormPage,
-            selectedMembersVisitDate: selectedMembersVisitDate?.normalized,
-            existingOccurredAt: targetExistingOccurredAt,
-        });
+
 
         if (!teiId || !enrollmentId || !orgUnitId || !programId || !programStageId) {
             log.warn(
@@ -465,27 +454,34 @@ export const useDataSource = (
             return;
         }
 
-        // setRecordOverrides(currentOverrides => applyRecordOverridePatch(currentOverrides, overrideScopeKey, rowId, overridePatch));
-
         try {
-            // const mutationResponse = await saveEventMutation({
-            //     events: [{
-            //         event: targetEventId,
-            //         trackedEntity: teiId,
-            //         enrollment: enrollmentId,
-            //         orgUnit: orgUnitId,
-            //         program: programId,
-            //         programStage: programStageId,
-            //         status: 'ACTIVE',
-            //         occurredAt: nextOccurredAt,
-            //         dataValues: [{
-            //             dataElement: column.id,
-            //             value: '',
-            //         }],
-            //     }],
-            // });
-            // throwIfTrackerMutationFailed(mutationResponse);
+            const dataElements = Object.entries(rowValueRef?.current?.[row] || {})
+                .map(([id, value]) => ({
+                    dataElement: id,
+                    value,
+                }));
+
+            const mutationResponse = await saveEventMutation({
+                events: [{
+                    event: targetEventId,
+                    trackedEntity: teiId,
+                    enrollment: enrollmentId,
+                    orgUnit: orgUnitId,
+                    program: programId,
+                    programStage: programStageId,
+                    status: 'ACTIVE',
+                    occurredAt: nextOccurredAt,
+                    dataValues: dataElements,
+                }],
+            });
+            recordOverride({ eventRecord, column, value: false, loading: true })
+            throwIfTrackerMutationFailed(mutationResponse);
         } catch (error) {
+            show({
+                message: `Ocorreu um erro gravar os dados`,
+                type: { critical: true }
+            });
+            setTimeout(hide, 5000);
             return;
         }
 
@@ -500,10 +496,12 @@ export const useDataSource = (
         eventRecord,
         column,
         value,
+        loading = false,
     }: {
         eventRecord: { [key: string]: any },
         column: { id: string, type: keyof typeof dataElementTypes },
         value: any,
+        loading?: boolean,
     }) => {
 
         const overrideScopeKey = getOverrideScopeKey({
@@ -511,9 +509,13 @@ export const useDataSource = (
             selectedMembersVisitDate: selectedMembersVisitDate?.normalized,
         });
         const rowId = eventRecord.id;
-        const overridePatch = {
+        setRowChanged(rowId);
+
+        const overridePatch = loading ? {
+            loading: value,
+        } : {
             [column.id]: value,
-        };
+        }
 
         setRecordOverrides(currentOverrides => applyRecordOverridePatch(currentOverrides, overrideScopeKey, rowId, overridePatch));
     };
@@ -566,6 +568,7 @@ export const useDataSource = (
                         }
 
                         if (isMembersFormPage && id === 'actions') {
+                            console.log(Boolean(rowValueRef.current?.[rowIndex]))
                             acc[id] = React.createElement(
                                 'div',
                                 { style: { display: 'flex', gap: '8px' } },
@@ -573,11 +576,29 @@ export const useDataSource = (
                                     Button,
                                     {
                                         small: true,
-                                        onClick: () => void persistEventCellValue({ eventRecord, column })
+                                        loading: eventRecord?.loading,
+                                        disabled: !Boolean(rowValueRef.current?.[rowIndex]),
+                                        onClick: () => {
+                                            const required: any = headers?.filter(x => x.required)
+                                            if (required?.length > 0)
+                                                for (let req of required) {
+                                                    if (!eventRecord[req.id]) {
+                                                        show({
+                                                            message: `Preencha todos os campos`,
+                                                            type: { warning: true }
+                                                        });
+                                                        setTimeout(hide, 5000);
+                                                    }
+                                                }
+
+                                            recordOverride({ eventRecord, column, value: true, loading: true })
+                                            void persistEventCellValue({ eventRecord, column, row: rowIndex })
+                                        }
                                     },
                                     '💾 Gravar'
                                 )
-                            );
+                            )
+
                             return acc;
                         }
 
@@ -588,7 +609,7 @@ export const useDataSource = (
                                 key: `${eventRecord.id}-${id}`,
                                 column: thisHeader,
                                 value: clientValue,
-                                ...(isMembersFormLocked ? { disabled: isMembersFormLocked } : {}),
+                                ...((isMembersFormLocked || eventRecord.loading) ? { disabled: (isMembersFormLocked || eventRecord.loading) } : {}),
                                 saveStatus: fieldSaveStatusById[getFieldSaveStatusKey(eventRecord.id, id)] || 'idle',
                                 onCommit: (nextClientValue: any) => {
                                     recordOverride({ eventRecord, column, value: nextClientValue })
@@ -599,7 +620,7 @@ export const useDataSource = (
                                             ...(rowValueRef.current[rowIndex] || {}),
                                             [column.id]: nextClientValue,
                                         },
-                                    };
+                                    }
                                     rowValueRef.current = nextRowValue;
                                 },
                             });
@@ -618,9 +639,7 @@ export const useDataSource = (
                                 const option = options.find(o => o.value === clientValue);
                                 if (!option) {
                                     log.error(
-                                        errorCreator(
-                                            'Missing value in options')(
-                                                { id, clientValue, options }),
+                                        errorCreator('Missing value in options')({ id, clientValue, options }),
                                     );
                                     acc[id] = convertClientToList(clientValue, type);
                                 } else {

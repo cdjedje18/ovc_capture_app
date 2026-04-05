@@ -178,8 +178,6 @@ export const CustomDhis2RulesEngine = (props: RulesEngineProps) => {
         for (const rule of newProgramRules.filter(x => x.variable === variable.id)) {
             const conditionResult = evaluateExpression(rule.condition, variable, values, programRulesVariables);
 
-            // console.log(rule, values, variable)
-
             switch (rule.programRuleActionType) {
                 case 'ASSIGN':
                     if (conditionResult) {
@@ -206,7 +204,6 @@ export const CustomDhis2RulesEngine = (props: RulesEngineProps) => {
 
                 case 'SHOWERROR':
                     variable.error = !!conditionResult;
-                    // variable.required = !!conditionResult;
                     variable.content = conditionResult ? rule.content : '';
                     break;
 
@@ -215,7 +212,6 @@ export const CustomDhis2RulesEngine = (props: RulesEngineProps) => {
                     break;
 
                 case 'SETMANDATORYFIELD':
-                    console.log(variable)
                     variable.required = !!conditionResult;
                     break;
 
