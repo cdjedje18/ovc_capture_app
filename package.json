@@ -18,6 +18,8 @@
         "@dhis2/ui": "^10.12.10",
         "@emotion/css": "^11.13.5",
         "@emotion/react": "^11.14.0",
+        "@emotion/styled": "^11.14.1",
+        "@mui/material": "^7.3.9",
         "@popperjs/core": "^2.11.6",
         "@react-leaflet/core": "^1.1.1",
         "@redux-offline/redux-offline": "^2.6.0",
