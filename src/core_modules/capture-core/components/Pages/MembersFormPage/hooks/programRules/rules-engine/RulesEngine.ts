@@ -178,55 +178,62 @@ export const CustomDhis2RulesEngine = (props: RulesEngineProps) => {
         for (const rule of newProgramRules.filter(x => x.variable === variable.id)) {
             const conditionResult = evaluateExpression(rule.condition, variable, values, programRulesVariables);
 
+            // console.log(rule, values, variable)
+
             switch (rule.programRuleActionType) {
-            case 'ASSIGN':
-                if (conditionResult) {
-                    const newValue = evaluateExpression(rule.data, variable, values, programRulesVariables);
-                    values[variable.id] = newValue ?? '';
-                    variable.value = newValue;
-                    variable.disabled = true;
-                } else variable.value = null;
-                
-                variable.rowChanged = rowChanged;
-                break;
+                case 'ASSIGN':
+                    if (conditionResult) {
+                        const newValue = evaluateExpression(rule.data, variable, values, programRulesVariables);
+                        values[variable.id] = newValue ?? '';
+                        variable.value = newValue;
+                        variable.disabled = true;
+                    } else variable.value = null;
 
-            case 'SHOWOPTIONGROUP':
-                if (conditionResult) {
-                    const options = getOptionGroups?.find(op => op.id === rule.optionGroup)?.options || [];
-                    variable.options = { optionSet: { options } };
-                }
-                break;
+                    variable.rowChanged = rowChanged;
+                    break;
 
-            case 'SHOWWARNING':
-                variable.warning = !!conditionResult;
-                variable.content = conditionResult ? rule.content : '';
-                break;
+                case 'SHOWOPTIONGROUP':
+                    if (conditionResult) {
+                        const options = getOptionGroups?.find(op => op.id === rule.optionGroup)?.options || [];
+                        variable.options = { optionSet: { options } };
+                    }
+                    break;
 
-            case 'SHOWERROR':
-                variable.error = !!conditionResult;
-                // variable.required = !!conditionResult;
-                variable.content = conditionResult ? rule.content : '';
-                break;
+                case 'SHOWWARNING':
+                    variable.warning = !!conditionResult;
+                    variable.content = conditionResult ? rule.content : '';
+                    break;
 
-            case 'HIDEFIELD':
-                variable.disabled = !!conditionResult;
-                break;
+                case 'SHOWERROR':
+                    variable.error = !!conditionResult;
+                    // variable.required = !!conditionResult;
+                    variable.content = conditionResult ? rule.content : '';
+                    break;
 
-            case 'HIDEOPTIONGROUP':
-                if (conditionResult && conditionResult[0]?.organisationUnits?.some((x: any) => x.value === values.orgUnit)) {
-                    const groupOptions = getOptionGroups?.find(op => op.id === rule.optionGroup)?.options || [];
-                    const initial = variable.initialOptions?.optionSet?.options || [];
-                    variable.options = {
-                        optionSet: {
-                            options: (variable.optionSet?.options || initial).filter(
-                                (o1: any) => !groupOptions.some((o2: any) => o2.value === o1.value),
-                            ),
-                        },
-                    };
-                } else if (!conditionResult && variable.initialOptions?.optionSet?.options) {
-                    variable.options = { optionSet: { options: variable.initialOptions?.optionSet?.options || [] } };
-                }
-                break;
+                case 'HIDEFIELD':
+                    variable.disabled = !!conditionResult;
+                    break;
+
+                case 'SETMANDATORYFIELD':
+                    console.log(variable)
+                    variable.required = !!conditionResult;
+                    break;
+
+                case 'HIDEOPTIONGROUP':
+                    if (conditionResult && conditionResult[0]?.organisationUnits?.some((x: any) => x.value === values.orgUnit)) {
+                        const groupOptions = getOptionGroups?.find(op => op.id === rule.optionGroup)?.options || [];
+                        const initial = variable.initialOptions?.optionSet?.options || [];
+                        variable.options = {
+                            optionSet: {
+                                options: (variable.optionSet?.options || initial).filter(
+                                    (o1: any) => !groupOptions.some((o2: any) => o2.value === o1.value),
+                                ),
+                            },
+                        };
+                    } else if (!conditionResult && variable.initialOptions?.optionSet?.options) {
+                        variable.options = { optionSet: { options: variable.initialOptions?.optionSet?.options || [] } };
+                    }
+                    break;
             }
         }
         return variable;
