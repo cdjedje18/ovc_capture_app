@@ -154,17 +154,17 @@ export const InlineEventCellField = React.memo(({
     }, [column.type, commit, disabled, value]);
 
     const commonStyle = { minWidth: 180 };
-    const statusNode = (saveStatus !== 'idle' || (column.required && !value))
+    const statusNode = (saveStatus !== 'idle' || (column.required && (!value && !localValue)))
         ? (
             <div
                 style={{
                     fontSize: 12,
                     fontWeight: 500,
                     marginTop: 6,
-                    color: (saveStatus === 'error' || (column.required && !value)) ? '#ff0000' : saveStatus === 'success' ? '#18c23d' : '#dcc414',
+                    color: (saveStatus === 'error' || (column.required && (!value && !localValue))) ? '#ff0000' : saveStatus === 'success' ? '#18c23d' : '#dcc414',
                 }}
             >
-                {saveStatus === 'saving' ? 'Enviando dados...' : saveStatus === 'success' ? 'Enviado' : (column.required && !value) ? 'Campo obrigatório*' : 'Campo inválido'}
+                {saveStatus === 'saving' ? 'Enviando dados...' : saveStatus === 'success' ? 'Enviado' : (column.required && (!value && !localValue)) ? 'Campo obrigatório*' : 'Campo inválido'}
             </div>
         )
         : null;

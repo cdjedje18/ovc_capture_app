@@ -474,11 +474,16 @@ export const useDataSource = (
                     dataValues: dataElements,
                 }],
             });
-            recordOverride({ eventRecord, column, value: false, loading: true })
+            recordOverride({ eventRecord, column, value: { loading: false, ...rowValueRef?.current?.[row] }, object: true })
+            show({
+                message: `Dados gravados com sucesso`,
+                type: { success: true }
+            });
+            setTimeout(hide, 5000);
             throwIfTrackerMutationFailed(mutationResponse);
         } catch (error) {
             show({
-                message: `Ocorreu um erro gravar os dados`,
+                message: `Ocorreu um erro ao gravar os dados`,
                 type: { critical: true }
             });
             setTimeout(hide, 5000);
@@ -496,12 +501,12 @@ export const useDataSource = (
         eventRecord,
         column,
         value,
-        loading = false,
+        object = false,
     }: {
         eventRecord: { [key: string]: any },
         column: { id: string, type: keyof typeof dataElementTypes },
         value: any,
-        loading?: boolean,
+        object?: boolean,
     }) => {
 
         const overrideScopeKey = getOverrideScopeKey({
@@ -511,12 +516,14 @@ export const useDataSource = (
         const rowId = eventRecord.id;
         setRowChanged(rowId);
 
-        const overridePatch = loading ? {
-            loading: value,
+        const overridePatch = object ? {
+            ...value
         } : {
             [column.id]: value,
         }
 
+        console.log(overridePatch)
+        
         setRecordOverrides(currentOverrides => applyRecordOverridePatch(currentOverrides, overrideScopeKey, rowId, overridePatch));
     };
 
@@ -591,7 +598,7 @@ export const useDataSource = (
                                                     }
                                                 }
 
-                                            recordOverride({ eventRecord, column, value: true, loading: true })
+                                            recordOverride({ eventRecord, column, value: { loading: true }, object: true })
                                             void persistEventCellValue({ eventRecord, column, row: rowIndex })
                                         }
                                     },
