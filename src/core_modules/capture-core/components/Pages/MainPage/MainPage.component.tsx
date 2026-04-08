@@ -42,6 +42,13 @@ const MainPageComponentPlain = ({
     const [open, setOpen] = useState(false);
     const { data, error: err, loading } = useDataStore()
 
+    if (data?.config?.entries?.length > 0) {
+        const nomeDoMembro = data?.config?.entries?.find(x => x.key == 'data_entry')?.value?.programs?.[0]?.nomeDoMembro || ''
+        if (nomeDoMembro && sessionStorage.getItem('nomeDoMembro') !== nomeDoMembro) {
+            sessionStorage.setItem('nomeDoMembro', nomeDoMembro)
+        }
+    }
+    
     return (
         <div
             className={cx({

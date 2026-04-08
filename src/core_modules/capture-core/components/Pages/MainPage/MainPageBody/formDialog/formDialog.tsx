@@ -8,17 +8,18 @@ import useShowAlerts from 'capture-core/components/Pages/MembersFormPage/hooks/c
 import { useCreateDsTemplate } from './dataStore/useCreateDsTemplate';
 
 export default function ConfigurationModal({ setOpen, open, data }: { setOpen: (open: boolean) => void, open: boolean, data: any }) {
-    const programs = Array.from(programCollection.values());
+    const programs = Array.from(programCollection.values()) as any;
     const [formData, setFormData] = useState<any>({
         masterProgram: '',
         masterProgramName: "",
         dataEntryProgram: "",
         dataEntryProgramStage: "",
-        relationshipType: ""
+        relationshipType: "",
+        nomeDoMembro: ""
     })
     const { relationshipTypes } = useTEIRelationshipsWidgetMetadata();
     const { hide, show } = useShowAlerts()
-    const {postDsTemplate } = useCreateDsTemplate()
+    const { postDsTemplate,loading } = useCreateDsTemplate()
 
     useEffect(() => {
         if (data?.length > 0) {
@@ -30,7 +31,8 @@ export default function ConfigurationModal({ setOpen, open, data }: { setOpen: (
                 masterProgramName: programs?.name,
                 dataEntryProgram: dataEntry?.program,
                 dataEntryProgramStage: dataEntry?.programStage,
-                relationshipType: programs?.relationshipType
+                relationshipType: programs?.relationshipType,
+                nomeDoMembro: dataEntry?.nomeDoMembro
             })
         }
     }, [data])
@@ -159,6 +161,34 @@ export default function ConfigurationModal({ setOpen, open, data }: { setOpen: (
                                 ))}
                             </SingleSelect>
                         </div>
+
+                        <div style={{ display: "grid", gridTemplateColumns: "40% 60%", marginBottom: "10px" }} >
+
+                            <span style={{ fontSize: "15px", marginTop: "10px" }} >
+                                Nome do membro
+                            </span>
+                            <SingleSelect
+                                clearable
+                                className="select"
+                                selected={formData.nomeDoMembro}
+                                onChange={(e) => {
+                                    setFormData(prev => ({ ...prev, nomeDoMembro: e.selected }))
+                                }}
+                            >
+                                {Array.from(
+                                    programs
+                                        ?.find(x => x.id === formData.dataEntryProgram)
+                                        ?._attributes
+                                        ?.values() || []
+                                ).map((stage: any) => (
+                                    <SingleSelectOption
+                                        key={stage.id}
+                                        label={stage.name}
+                                        value={stage.id}
+                                    />
+                                ))}
+                            </SingleSelect>
+                        </div>
                     </ModalContent>
 
                     <ModalActions>
@@ -166,7 +196,7 @@ export default function ConfigurationModal({ setOpen, open, data }: { setOpen: (
                             <Button onClick={() => setOpen(false)}>
                                 Cancel
                             </Button>
-                            <Button primary onClick={() => save()} >
+                            <Button loading={loading} primary onClick={() => save()} >
                                 Salvar
                             </Button>
                         </ButtonStrip>

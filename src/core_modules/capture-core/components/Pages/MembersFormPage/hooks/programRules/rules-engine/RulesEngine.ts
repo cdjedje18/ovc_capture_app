@@ -1,10 +1,9 @@
-import isEqual from 'isEqual';
-import { useRecoilValue } from 'recoil';
-import { useState, useEffect } from 'react';
+import { useRecoilValue, useSetRecoilState } from 'recoil';
 import { useFormatProgramRules } from '../hooks/useFormatProgramRules';
 import { OptionGroupsConfigState } from '../../../schema/optionGroupsSchema';
 import { OrgUnitsGroupsConfigState } from '../../../schema/orgUnitsGroupSchema';
 import { useFormatProgramRulesVariables } from '../hooks/useFormatProgramRulesVariables';
+import { displayTextRule } from '../../../schema/infoSchema';
 
 interface RulesEngineProps {
     variables?: any[]
@@ -20,6 +19,7 @@ export const CustomDhis2RulesEngine = (props: RulesEngineProps) => {
     const orgUnitsGroups = useRecoilValue(OrgUnitsGroupsConfigState);
     const { programRulesVariables } = useFormatProgramRulesVariables(program);
     const { newProgramRules } = useFormatProgramRules(program);
+    const setDisplayTextRule = useSetRecoilState(displayTextRule);
 
     // const [currentValues, setCurrentValues] = useState({ ...props.values });
     // const [updatedVariables, setUpdatedVariables] = useState<any[]>(Array.isArray(props.variables) ? [...props.variables] : []);
@@ -30,51 +30,44 @@ export const CustomDhis2RulesEngine = (props: RulesEngineProps) => {
     //     }
     // }, [props.variables]);
 
-    function runRulesEngine(arg?: { overrideVariables?: any[], overrideValues?: Record<string, any> }) {
-        const { overrideVariables = [], overrideValues = {} } = arg || {};
+    function runRulesEngine(arg?: { overrideVariables?: any[], overrideValues?: Record<string, any>, idx?: number }) {
+        const { overrideVariables = [], overrideValues = {}, idx } = arg || {};
         const variablesToUse = overrideVariables;
         const valuesToUse = overrideValues;
 
-        // console.log(valuesToUse, variablesToUse, 'yuiiiii')
-        // if (!isEqual(currentValues, valuesToUse)) {
-        //     setCurrentValues({ ...valuesToUse });
-        // }
-        // if (!isEqual(updatedVariables, variablesToUse)) {
-        //     setUpdatedVariables([...variablesToUse]);
-        // }
-
-        if (type === 'programStageSection') return rulesEngineSections(variablesToUse, valuesToUse);
-        else if (type === 'programStage') return rulesEngineDataElements(variablesToUse, valuesToUse);
-        else if (type === 'attributesSection') return rulesEngineAttributesSections(variablesToUse, valuesToUse);
+        if (type === 'programStageSection') return rulesEngineSections(variablesToUse, valuesToUse, idx);
+        else if (type === 'programStage') return rulesEngineDataElements(variablesToUse, valuesToUse, idx!);
+        else if (type === 'attributesSection') return rulesEngineAttributesSections(variablesToUse, valuesToUse, idx);
     }
 
-    function rulesEngineAttributesSections(variables: any[], values: Record<string, any>) {
+    function rulesEngineAttributesSections(variables: any[], values: Record<string, any>, idx?: number) {
         const updated = variables.map(section => ({
             ...section,
             variable: section.variable.map((variable: any) => {
                 const copy = { ...variable };
-                return applyRulesToVariable(copy, values);
-            }),
-        }));
-        // setUpdatedVariables(updated);
-    }
-
-    function rulesEngineSections(variables: any[], values: Record<string, any>) {
-        const updated = variables.map(section => ({
-            ...section,
-            fields: section.fields.map((variable: any) => {
-                const copy = { ...variable };
-                return applyRulesToVariable(copy, values);
+                return applyRulesToVariable(copy, values, idx!);
             }),
         }));
         return updated;
         // setUpdatedVariables(updated);
     }
 
-    function rulesEngineDataElements(variables: any[], values: Record<string, any>) {
+    function rulesEngineSections(variables: any[], values: Record<string, any>, idx?: number) {
+        const updated = variables.map(section => ({
+            ...section,
+            fields: section.fields.map((variable: any) => {
+                const copy = { ...variable };
+                return applyRulesToVariable(copy, values, idx!);
+            }),
+        }));
+        return updated;
+        // setUpdatedVariables(updated);
+    }
+
+    function rulesEngineDataElements(variables: any[], values: Record<string, any>, idx?: number) {
         const updated = variables.map((variable) => {
             const copy = { ...variable };
-            return applyRulesToVariable(copy, values);
+            return applyRulesToVariable(copy, values, idx);
         });
         return updated;
 
@@ -174,11 +167,27 @@ export const CustomDhis2RulesEngine = (props: RulesEngineProps) => {
         };
     }
 
-    function applyRulesToVariable(variable: any, values: Record<string, any>) {
-        for (const rule of newProgramRules.filter(x => x.variable === variable.id || x.variable === variable.section)) {
+    function applyRulesToVariable(variable: any, values: Record<string, any>, idx?: number) {
+        for (const rule of newProgramRules.filter(x => x.variable === variable.id || x.variable === variable.section || x.programRuleActionType == 'DISPLAYTEXT')) {
             const conditionResult = evaluateExpression(rule.condition, variable, values, programRulesVariables);
 
+            // console.log(rule)
             switch (rule.programRuleActionType) {
+                case 'DISPLAYTEXT':
+                    setDisplayTextRule(prev => {
+                        if (conditionResult && !prev.find(x => x.key === idx)) {
+                            return [...prev, {
+                                key: idx,
+                                name: values[sessionStorage.getItem('nomeDoMembro') || ''],
+                                content: rule.content
+                            }];
+                        } else if (!conditionResult) {
+                            return prev.filter(x => x.key !== idx);
+                        }
+                        return prev
+                    });
+                    break;
+
                 case 'ASSIGN':
                     if (conditionResult) {
                         const newValue = evaluateExpression(rule.data, variable, values, programRulesVariables);

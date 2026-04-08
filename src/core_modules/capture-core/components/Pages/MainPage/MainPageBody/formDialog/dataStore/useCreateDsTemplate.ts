@@ -19,7 +19,8 @@ export const useCreateDsTemplate = () => {
             "programs": [
                 {
                     "program": data?.dataEntryProgram,
-                    "programStage": data?.dataEntryProgramStage
+                    "programStage": data?.dataEntryProgramStage,
+                    "nomeDoMembro": data?.nomeDoMembro
                 }
             ]
         }

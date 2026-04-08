@@ -56,7 +56,6 @@ const SELECTED_DATE_EVENTS_QUERY: any = {
 const getOccurredAtDate = (occurredAt?: string) => occurredAt?.slice(0, 10);
 const DEFAULT_OVERRIDE_SCOPE = '__default';
 const getJoinedTeiIds = (teiIds: Array<string>) => teiIds.join(featureAvailable(FEATURES.newUIDsSeparator) ? ',' : ';');
-const getFieldSaveStatusKey = (rowId: string, columnId: string) => `${rowId}:${columnId}`;
 
 const throwIfTrackerMutationFailed = (response: any) => {
     const normalizedResponse = response?.response || response?.details || response;
@@ -274,7 +273,8 @@ export const useDataSource = (
         [key: string]: any,
     }>,
     currentProgramStageId?: string,
-) => {
+    program?: any,
+   ) => {
     const isMembersFormPage = isMembersFormPageRoute();
     const selectedMembersVisitDate = useSelectedMembersVisitDate();
     const isMembersFormLocked = isMembersFormPage && !selectedMembersVisitDate?.normalized;
@@ -287,7 +287,6 @@ export const useDataSource = (
     const [saveEventMutation] = useDataMutation(TRACKER_EVENT_MUTATION);
     const [recordOverrides, setRecordOverrides] = useState<{ [key: string]: { [key: string]: any } }>({});
     const [rowChanged, setRowChanged] = useState<string>('');
-    const [fieldSaveStatusById, setFieldSaveStatusById] = useState<Record<string, 'idle' | 'saving' | 'success' | 'error'>>({});
     const activeOverrideScopeKey = getOverrideScopeKey({
         isMembersFormPage,
         selectedMembersVisitDate: selectedMembersVisitDate?.normalized,
@@ -305,7 +304,7 @@ export const useDataSource = (
         return fetchedSelectedDateEventsByTei;
     }, [fetchedSelectedDateEventsByTei, isMembersFormPage, selectedMembersVisitDate?.normalized]);
 
-    const { runRulesEngine } = isMembersFormPage ? CustomDhis2RulesEngine({ program: 'pVgO58r40Au', type: 'programStage', rowChanged }) : {};
+    const { runRulesEngine } = isMembersFormPage ? CustomDhis2RulesEngine({ program: program._id, type: 'programStage', rowChanged }) : {};
     const rowValueRef = useRef({});
     const { hide, show } = useShowAlerts()
 
@@ -527,9 +526,8 @@ export const useDataSource = (
         if (eventRecordsArray) return eventRecordsArray
             .map((eventRecord, rowIndex) => {
                 const activeRowOverride = ((recordOverrides[activeOverrideScopeKey] || {})[eventRecord.id] || {});
-                const headers = isMembersFormPage ? runRulesEngine!({ overrideValues: eventRecord, overrideVariables: columns }) : columns;
+                const headers = isMembersFormPage ? runRulesEngine!({ overrideValues: eventRecord, overrideVariables: columns, idx: rowIndex }) : columns;
 
-                // console.log(columns,'abababab')
                 const listRecord = columns
                     .filter(column => column.visible)
                     .reduce((acc, column) => {
@@ -613,7 +611,7 @@ export const useDataSource = (
                                 column: thisHeader,
                                 value: clientValue,
                                 ...((isMembersFormLocked || eventRecord.loading) ? { disabled: (isMembersFormLocked || eventRecord.loading) } : {}),
-                                saveStatus: fieldSaveStatusById[getFieldSaveStatusKey(eventRecord.id, id)] || 'idle',
+                                saveStatus: 'idle',
                                 onCommit: (nextClientValue: any) => {
                                     recordOverride({ eventRecord, column, value: nextClientValue })
 
@@ -664,7 +662,6 @@ export const useDataSource = (
         eventRecordsArray,
         columns,
         baseUrl,
-        fieldSaveStatusById,
         isMembersFormPage,
         isMembersFormLocked,
         persistEventCellValue,
