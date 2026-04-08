@@ -21,15 +21,6 @@ export const CustomDhis2RulesEngine = (props: RulesEngineProps) => {
     const { newProgramRules } = useFormatProgramRules(program);
     const setDisplayTextRule = useSetRecoilState(displayTextRule);
 
-    // const [currentValues, setCurrentValues] = useState({ ...props.values });
-    // const [updatedVariables, setUpdatedVariables] = useState<any[]>(Array.isArray(props.variables) ? [...props.variables] : []);
-
-    // useEffect(() => {
-    //     if (!isEqual(updatedVariables, props.variables)) {
-    //         setUpdatedVariables([...props.variables]);
-    //     }
-    // }, [props.variables]);
-
     function runRulesEngine(arg?: { overrideVariables?: any[], overrideValues?: Record<string, any>, idx?: number }) {
         const { overrideVariables = [], overrideValues = {}, idx } = arg || {};
         const variablesToUse = overrideVariables;
@@ -49,7 +40,6 @@ export const CustomDhis2RulesEngine = (props: RulesEngineProps) => {
             }),
         }));
         return updated;
-        // setUpdatedVariables(updated);
     }
 
     function rulesEngineSections(variables: any[], values: Record<string, any>, idx?: number) {
@@ -61,7 +51,6 @@ export const CustomDhis2RulesEngine = (props: RulesEngineProps) => {
             }),
         }));
         return updated;
-        // setUpdatedVariables(updated);
     }
 
     function rulesEngineDataElements(variables: any[], values: Record<string, any>, idx?: number) {
@@ -70,10 +59,7 @@ export const CustomDhis2RulesEngine = (props: RulesEngineProps) => {
             return applyRulesToVariable(copy, values, idx);
         });
         return updated;
-
-        // setUpdatedVariables(updated);
     }
-
 
     function parseValue(value: any) {
         if (value === undefined || value === null || value === '') {
