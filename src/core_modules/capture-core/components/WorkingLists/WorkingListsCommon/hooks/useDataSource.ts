@@ -274,7 +274,7 @@ export const useDataSource = (
     }>,
     currentProgramStageId?: string,
     program?: any,
-   ) => {
+) => {
     const isMembersFormPage = isMembersFormPageRoute();
     const selectedMembersVisitDate = useSelectedMembersVisitDate();
     const isMembersFormLocked = isMembersFormPage && !selectedMembersVisitDate?.normalized;
@@ -320,20 +320,12 @@ export const useDataSource = (
                             return acc;
                         }, {});
 
-                        return columns
-                            .filter(column => column.additionalColumn)
-                            .reduce((acc, column) => {
-                                const rawValue = column.mainProperty
-                                    ? selectedDateEvent?.[getFilterApiName(column.id)]
-                                    : selectedDateEventValues[column.id];
-
-                                acc[column.id] = rawValue == null ? undefined : convertServerToClient(rawValue, column.type);
-                                return acc;
-                            }, {
-                                [EVENT_METADATA_KEYS.eventId]: selectedDateEvent?.event,
-                                [EVENT_METADATA_KEYS.occurredAt]: selectedDateEvent?.occurredAt,
-                                [EVENT_METADATA_KEYS.syntheticForSelectedDate]: false,
-                            });
+                        return {
+                            [EVENT_METADATA_KEYS.eventId]: selectedDateEvent?.event,
+                            [EVENT_METADATA_KEYS.occurredAt]: selectedDateEvent?.occurredAt,
+                            [EVENT_METADATA_KEYS.syntheticForSelectedDate]: false,
+                            ...selectedDateEventValues,
+                        };
                     })() : {}),
                     ...((recordOverrides[activeOverrideScopeKey] || {})[id] || {}),
                     id,
@@ -433,7 +425,7 @@ export const useDataSource = (
             return;
         }
 
-        const targetEventId = targetExistingEventId || generateUID();
+        const targetEventId = rowValueRef.current?.[row]?.[EVENT_METADATA_KEYS.eventId] || targetExistingEventId || generateUID();
         const nextOccurredAt = getOccurredAtForSave({
             eventId: targetExistingEventId,
             existingOccurredAt: targetExistingOccurredAt,
@@ -452,7 +444,8 @@ export const useDataSource = (
         }
 
         try {
-            const dataElements = Object.entries(rowValueRef?.current?.[row] || {})
+            const { [EVENT_METADATA_KEYS.eventId]: _, ...rest } = rowValueRef?.current?.[row] || {};
+            const dataElements = Object.entries(rest)
                 .map(([id, value]) => ({
                     dataElement: id,
                     value,
@@ -471,7 +464,26 @@ export const useDataSource = (
                     dataValues: dataElements,
                 }],
             });
-            recordOverride({ eventRecord, column, value: { loading: false, ...rowValueRef?.current?.[row] }, object: true })
+
+            if (!eventId) {
+                const nextRowValue = {
+                    ...rowValueRef.current,
+                    [row]: {
+                        ...(rowValueRef.current[row] || {}),
+                        [EVENT_METADATA_KEYS.eventId]: targetEventId,
+                    },
+                }
+                rowValueRef.current = nextRowValue;
+            }
+
+            console.log(eventId)
+            recordOverride({
+                eventRecord,
+                column,
+                value: { loading: false, ...rowValueRef?.current?.[row] },
+                object: true
+            })
+
             show({
                 message: `Dados gravados com sucesso`,
                 type: { success: true }
@@ -581,7 +593,9 @@ export const useDataSource = (
                                         disabled: !Boolean(rowValueRef.current?.[rowIndex]),
                                         onClick: () => {
                                             const required: any = headers?.filter(x => x.required)
-                                            if (required?.length > 0)
+                                            const error: any = headers?.filter(x => x.error)
+
+                                            if (required?.length > 0 || error?.length > 0)
                                                 for (let req of required) {
                                                     if (!eventRecord[req.id]) {
                                                         show({
@@ -589,6 +603,8 @@ export const useDataSource = (
                                                             type: { warning: true }
                                                         });
                                                         setTimeout(hide, 5000);
+
+                                                        return;
                                                     }
                                                 }
 

@@ -6,7 +6,7 @@ import { MainPageBody } from './MainPageBody';
 import type { MainPageComponentProps } from './mainPage.types';
 import { MainPageStatuses } from './shared/constants';
 import { Fab } from '@mui/material';
-import { IconSettings24 } from '@dhis2/ui';
+import { CircularLoader, IconSettings24 } from '@dhis2/ui';
 import ConfigurationModal from './MainPageBody/formDialog/formDialog';
 import { useDataStore } from './MainPageBody/formDialog/dataStore/useDataStore';
 
@@ -43,48 +43,53 @@ const MainPageComponentPlain = ({
     const { data, error: err, loading } = useDataStore()
 
     if (data?.config?.entries?.length > 0) {
-        const nomeDoMembro = data?.config?.entries?.find(x => x.key == 'data_entry')?.value?.programs?.[0]?.nomeDoMembro || ''
-        if (nomeDoMembro && sessionStorage.getItem('nomeDoMembro') !== nomeDoMembro) {
+        const nomeDoMembro = data?.config?.entries?.find((x: any) => x.key == 'data_entry')?.value?.programs?.[0]?.nomeDoMembro || ''
+        if (nomeDoMembro) {
             sessionStorage.setItem('nomeDoMembro', nomeDoMembro)
         }
     }
-    
+
     return (
         <div
             className={cx({
                 [classes.containerBulkDataEntry]: mainPageStatus === MainPageStatuses.SHOW_BULK_DATA_ENTRY_PLUGIN,
             })}
         >
-            <TopBar programId={programId} orgUnitId={orgUnitId} selectedCategories={selectedCategories} />
-            <MainPageBody
-                mainPageStatus={mainPageStatus}
-                programId={programId || ''}
-                orgUnitId={orgUnitId}
-                trackedEntityTypeId={trackedEntityTypeId}
-                selectedTemplateId={selectedTemplateId}
-                setShowAccessible={onSetShowAccessible}
-                onChangeTemplate={onChangeTemplate}
-                error={error || false}
-                ready={ready}
-                displayFrontPageList={displayFrontPageList}
-                onCloseBulkDataEntryPlugin={onCloseBulkDataEntryPlugin}
-                onOpenBulkDataEntryPlugin={onOpenBulkDataEntryPlugin}
-                bulkDataEntryTrackedEntityIds={bulkDataEntryTrackedEntityIds}
-            />
-            <Fab
-                color="primary"
-                aria-label="add"
-                style={{
-                    position: 'fixed',
-                    bottom: 16,
-                    right: 16,
-                }}
-                onClick={() => setOpen(true)}
-            >
-                <IconSettings24 />
-            </Fab>
+            {
+                loading ? <CircularLoader /> :
+                    <>
+                        <TopBar programId={programId} orgUnitId={orgUnitId} selectedCategories={selectedCategories} />
+                        <MainPageBody
+                            mainPageStatus={mainPageStatus}
+                            programId={programId || ''}
+                            orgUnitId={orgUnitId}
+                            trackedEntityTypeId={trackedEntityTypeId}
+                            selectedTemplateId={selectedTemplateId}
+                            setShowAccessible={onSetShowAccessible}
+                            onChangeTemplate={onChangeTemplate}
+                            error={error || false}
+                            ready={ready}
+                            displayFrontPageList={displayFrontPageList}
+                            onCloseBulkDataEntryPlugin={onCloseBulkDataEntryPlugin}
+                            onOpenBulkDataEntryPlugin={onOpenBulkDataEntryPlugin}
+                            bulkDataEntryTrackedEntityIds={bulkDataEntryTrackedEntityIds}
+                        />
+                        <Fab
+                            color="primary"
+                            aria-label="add"
+                            style={{
+                                position: 'fixed',
+                                bottom: 16,
+                                right: 16,
+                            }}
+                            onClick={() => setOpen(true)}
+                        >
+                            <IconSettings24 />
+                        </Fab>
 
-            <ConfigurationModal data={data?.config?.entries} open={open} setOpen={setOpen} />
+                        <ConfigurationModal data={data?.config?.entries} open={open} setOpen={setOpen} />
+                    </>
+            }
         </div>
     )
 };

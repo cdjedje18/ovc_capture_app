@@ -58,6 +58,7 @@ export const CustomDhis2RulesEngine = (props: RulesEngineProps) => {
             const copy = { ...variable };
             return applyRulesToVariable(copy, values, idx);
         });
+        // console.log(values,'in the sec')
         return updated;
     }
 

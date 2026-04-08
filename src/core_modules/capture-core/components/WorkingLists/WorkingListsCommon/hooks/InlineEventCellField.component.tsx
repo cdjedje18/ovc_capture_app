@@ -113,7 +113,8 @@ export const InlineEventCellField = React.memo(({
 
     useEffect(() => {
         if (column.value !== null && column?.rowChanged && column?.rowChanged?.length > 0) {
-            onCommit(column?.value, true);
+            commit(column?.value);
+            // onCommit(column?.value, true);
         }
     }, [column.value]);
 
