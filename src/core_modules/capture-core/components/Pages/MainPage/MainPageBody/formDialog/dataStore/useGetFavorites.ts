@@ -18,7 +18,7 @@ export function useGetFavorites() {
 
         await engine.query(DATASTORE_QUERY(), {
             onComplete: (data) => {
-                console.log(data,'bla matusse')
+                // console.log(data,'bla matusse')
             },
             onError: (error) => {
                 show({

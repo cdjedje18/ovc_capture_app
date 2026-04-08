@@ -17,6 +17,8 @@ type Props = {
         value?: any
         rowChanged?: string
         required?: boolean
+        error?: boolean
+        content?: string
     };
     value: any;
     onCommit: (value: any, handledByRule?: boolean) => void;
@@ -154,17 +156,18 @@ export const InlineEventCellField = React.memo(({
     }, [column.type, commit, disabled, value]);
 
     const commonStyle = { minWidth: 180 };
-    const statusNode = (saveStatus !== 'idle' || (column.required && (!value && !localValue)))
+    const showMessage = column.required && (!value && !localValue);
+    const statusNode = (saveStatus !== 'idle' || showMessage || column?.error)
         ? (
             <div
                 style={{
                     fontSize: 12,
                     fontWeight: 500,
                     marginTop: 6,
-                    color: (saveStatus === 'error' || (column.required && (!value && !localValue))) ? '#ff0000' : saveStatus === 'success' ? '#18c23d' : '#dcc414',
+                    color: (saveStatus === 'error' || showMessage || column?.error) ? '#ff0000' : saveStatus === 'success' ? '#18c23d' : '#dcc414',
                 }}
             >
-                {saveStatus === 'saving' ? 'Enviando dados...' : saveStatus === 'success' ? 'Enviado' : (column.required && (!value && !localValue)) ? 'Campo obrigatório*' : 'Campo inválido'}
+                {column?.error ? column?.content : saveStatus === 'saving' ? 'Enviando dados...' : saveStatus === 'success' ? 'Enviado' : showMessage ? 'Campo obrigatório*' : 'Campo inválido'}
             </div>
         )
         : null;

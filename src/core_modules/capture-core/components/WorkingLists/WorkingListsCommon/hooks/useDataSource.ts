@@ -288,7 +288,6 @@ export const useDataSource = (
     const [recordOverrides, setRecordOverrides] = useState<{ [key: string]: { [key: string]: any } }>({});
     const [rowChanged, setRowChanged] = useState<string>('');
     const [fieldSaveStatusById, setFieldSaveStatusById] = useState<Record<string, 'idle' | 'saving' | 'success' | 'error'>>({});
-    const fieldSaveTimeoutsRef = useRef<Record<string, number>>({});
     const activeOverrideScopeKey = getOverrideScopeKey({
         isMembersFormPage,
         selectedMembersVisitDate: selectedMembersVisitDate?.normalized,
@@ -306,7 +305,7 @@ export const useDataSource = (
         return fetchedSelectedDateEventsByTei;
     }, [fetchedSelectedDateEventsByTei, isMembersFormPage, selectedMembersVisitDate?.normalized]);
 
-    const { runRulesEngine/* , updatedVariables */ } = isMembersFormPage ? CustomDhis2RulesEngine({ program: 'pVgO58r40Au', type: 'programStage', rowChanged }) : {};
+    const { runRulesEngine } = isMembersFormPage ? CustomDhis2RulesEngine({ program: 'pVgO58r40Au', type: 'programStage', rowChanged }) : {};
     const rowValueRef = useRef({});
     const { hide, show } = useShowAlerts()
 
@@ -421,7 +420,6 @@ export const useDataSource = (
         const targetExistingEventId = shouldReuseExistingEvent ? eventId : undefined;
         const targetExistingOccurredAt = shouldReuseExistingEvent ? existingOccurredAt : undefined;
 
-
         if (!teiId || !enrollmentId || !orgUnitId || !programId || !programStageId) {
             log.warn(
                 errorCreator('Could not save event cell value due to missing metadata')({
@@ -522,8 +520,6 @@ export const useDataSource = (
             [column.id]: value,
         }
 
-        console.log(overridePatch)
-        
         setRecordOverrides(currentOverrides => applyRecordOverridePatch(currentOverrides, overrideScopeKey, rowId, overridePatch));
     };
 
@@ -533,6 +529,7 @@ export const useDataSource = (
                 const activeRowOverride = ((recordOverrides[activeOverrideScopeKey] || {})[eventRecord.id] || {});
                 const headers = isMembersFormPage ? runRulesEngine!({ overrideValues: eventRecord, overrideVariables: columns }) : columns;
 
+                // console.log(columns,'abababab')
                 const listRecord = columns
                     .filter(column => column.visible)
                     .reduce((acc, column) => {
@@ -575,7 +572,6 @@ export const useDataSource = (
                         }
 
                         if (isMembersFormPage && id === 'actions') {
-                            console.log(Boolean(rowValueRef.current?.[rowIndex]))
                             acc[id] = React.createElement(
                                 'div',
                                 { style: { display: 'flex', gap: '8px' } },

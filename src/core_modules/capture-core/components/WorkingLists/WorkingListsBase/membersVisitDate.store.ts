@@ -2,6 +2,7 @@ import moment from 'moment';
 import { useSyncExternalStore } from 'react';
 
 let state: { original: string, normalized: string } | any;
+
 let availableDates: Array<string> = [];
 let loadingSelectedDateEvents = false;
 const listeners = new Set<() => void>();

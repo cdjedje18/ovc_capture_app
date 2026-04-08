@@ -175,7 +175,7 @@ export const CustomDhis2RulesEngine = (props: RulesEngineProps) => {
     }
 
     function applyRulesToVariable(variable: any, values: Record<string, any>) {
-        for (const rule of newProgramRules.filter(x => x.variable === variable.id)) {
+        for (const rule of newProgramRules.filter(x => x.variable === variable.id || x.variable === variable.section)) {
             const conditionResult = evaluateExpression(rule.condition, variable, values, programRulesVariables);
 
             switch (rule.programRuleActionType) {
@@ -215,6 +215,11 @@ export const CustomDhis2RulesEngine = (props: RulesEngineProps) => {
                     variable.required = !!conditionResult;
                     break;
 
+                case 'HIDESECTION':
+                    console.log(variable, 'ahaaaaaaa')
+                    variable.disabled = !!conditionResult;
+                    break;
+
                 case 'HIDEOPTIONGROUP':
                     if (conditionResult && conditionResult[0]?.organisationUnits?.some((x: any) => x.value === values.orgUnit)) {
                         const groupOptions = getOptionGroups?.find(op => op.id === rule.optionGroup)?.options || [];
@@ -232,6 +237,7 @@ export const CustomDhis2RulesEngine = (props: RulesEngineProps) => {
                     break;
             }
         }
+
         return variable;
     }
 
