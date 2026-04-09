@@ -476,7 +476,6 @@ export const useDataSource = (
                 rowValueRef.current = nextRowValue;
             }
 
-            console.log(eventId)
             recordOverride({
                 eventRecord,
                 column,
@@ -544,19 +543,19 @@ export const useDataSource = (
                     .filter(column => column.visible)
                     .reduce((acc, column) => {
                         const { id, type, options, resolveValue } = column;
-                        const isSelectedDateMatch = hasEventForSelectedDate({
-                            isMembersFormPage,
-                            selectedMembersVisitDate: selectedMembersVisitDate?.normalized,
-                            occurredAt: eventRecord[EVENT_METADATA_KEYS.occurredAt],
-                        });
-                        const isSyntheticEventForSelectedDate = Boolean(eventRecord[EVENT_METADATA_KEYS.syntheticForSelectedDate]);
-                        const shouldBlankEventValue = isMembersFormPage
-                            && (
-                                !isSelectedDateMatch
-                                || (isSyntheticEventForSelectedDate && activeRowOverride[id] === undefined)
-                            )
-                            && (column.additionalColumn || column.mainProperty);
-                        const clientValue = shouldBlankEventValue ? undefined : eventRecord[id];
+                        // const isSelectedDateMatch = hasEventForSelectedDate({
+                        //     isMembersFormPage,
+                        //     selectedMembersVisitDate: selectedMembersVisitDate?.normalized,
+                        //     occurredAt: eventRecord[EVENT_METADATA_KEYS.occurredAt],
+                        // });
+                        // const isSyntheticEventForSelectedDate = Boolean(eventRecord[EVENT_METADATA_KEYS.syntheticForSelectedDate]);
+                        // const shouldBlankEventValue = isMembersFormPage
+                        //     && (
+                        //         !isSelectedDateMatch
+                        //         || (isSyntheticEventForSelectedDate && activeRowOverride[id] === undefined)
+                        //     )
+                        //     && (column.additionalColumn || column.mainProperty);
+                        const clientValue = /*shouldBlankEventValue ? undefined :*/ eventRecord[id];
 
                         if (isMembersFormPage && id === MEMBERS_CAPTURE_LINK_COLUMN_ID) {
                             const captureEnrollmentUrl = getCaptureEnrollmentUrl({
@@ -621,7 +620,6 @@ export const useDataSource = (
 
                         if (isMembersFormPage && column.additionalColumn) {
                             const thisHeader = headers?.find(x => x.id == column.id);
-
                             acc[id] = React.createElement(InlineEventCellField, {
                                 key: `${eventRecord.id}-${id}`,
                                 column: thisHeader,

@@ -104,8 +104,9 @@ const getEventsMetaDataConfig = (
         return [];
     }
 
+    const allElements = getDataValuesMetaDataConfig([...stageForm.getElements()], forceVisible, hideInColumnSelector);
     if (!selectedSectionId) {
-        return getDataValuesMetaDataConfig([...stageForm.getElements()], forceVisible, hideInColumnSelector);
+        return allElements;
     }
 
     const selectedSection = stageForm.getSection(selectedSectionId);
@@ -120,7 +121,15 @@ const getEventsMetaDataConfig = (
         return acc.concat(element);
     }, []);
 
-    return getDataValuesMetaDataConfig(dataElementsInSection, forceVisible, hideInColumnSelector);
+    const sectionFields = getDataValuesMetaDataConfig(dataElementsInSection, forceVisible, hideInColumnSelector)
+
+    allElements.forEach(field => {
+        if (!sectionFields.some(sectionField => sectionField.id === field.id)) {
+            field.visible = false;
+        }
+    })
+
+    return allElements;
 };
 
 const MEMBERS_FORM_VISIBLE_ATTRIBUTE_ID = 'PP0L2IEL4Dm';
@@ -209,7 +218,7 @@ export const useDefaultColumnConfig = (
 
         if (programStageId && programStage) {
             const shouldForceVisibleDataElements = isMembersFormPage && !!selectedSectionId;
-            return defaultColumns.concat([
+            const stageCols = [
                 ...getProgramStageMainConfig(programStage, isMembersFormPage, false),
                 ...getEventsMetaDataConfig(
                     programStage,
@@ -217,7 +226,10 @@ export const useDefaultColumnConfig = (
                     shouldForceVisibleDataElements,
                     false,
                 ),
-            ]);
+            ]
+
+            return defaultColumns.concat(stageCols);
         }
+
         return defaultColumns;
     }, [orgUnitId, program, programStageId, selectedSectionId]);
