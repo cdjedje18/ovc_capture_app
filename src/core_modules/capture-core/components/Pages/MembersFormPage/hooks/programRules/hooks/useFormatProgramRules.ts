@@ -4,8 +4,9 @@ import { formatProgramRules } from '../programRulesUtils/formatProgramRules';
 
 export function useFormatProgramRules(program: string) {
     const programRulesConfigState = useRecoilValue(ProgramRulesConfigState);
+    const rules = formatProgramRules(programRulesConfigState).filter(pRule => pRule.program === program)
 
     return {
-        newProgramRules: formatProgramRules(programRulesConfigState).filter(pRule => pRule.program === program),
+        newProgramRules: rules?.filter(x => x.programStage == sessionStorage.getItem('dataEntryStage')),
     };
 }

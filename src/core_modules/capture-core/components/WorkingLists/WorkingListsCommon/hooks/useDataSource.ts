@@ -323,6 +323,7 @@ export const useDataSource = (
                         return {
                             [EVENT_METADATA_KEYS.eventId]: selectedDateEvent?.event,
                             [EVENT_METADATA_KEYS.occurredAt]: selectedDateEvent?.occurredAt,
+                            'event_date': selectedMembersVisitDate?.normalized,
                             [EVENT_METADATA_KEYS.syntheticForSelectedDate]: false,
                             ...selectedDateEventValues,
                         };
@@ -331,6 +332,7 @@ export const useDataSource = (
                     id,
                 };
                 setRowChanged('');
+                console.log(data)
                 return data;
             }), [
         records,
