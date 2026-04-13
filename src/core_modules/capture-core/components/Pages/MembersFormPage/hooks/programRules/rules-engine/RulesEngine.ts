@@ -32,9 +32,9 @@ export const CustomDhis2RulesEngine = (props: RulesEngineProps) => {
     }
 
     function rulesEngineAttributesSections(variables: any[], values: Record<string, any>, idx?: number) {
-        const updated = variables.map(section => ({
+        const updated = variables?.map(section => ({
             ...section,
-            variable: section.variable.map((variable: any) => {
+            variable: section?.variable.map((variable: any) => {
                 const copy = { ...variable };
                 return applyRulesToVariable(copy, values, idx!);
             }),
@@ -43,9 +43,9 @@ export const CustomDhis2RulesEngine = (props: RulesEngineProps) => {
     }
 
     function rulesEngineSections(variables: any[], values: Record<string, any>, idx?: number) {
-        const updated = variables.map(section => ({
+        const updated = variables?.map(section => ({
             ...section,
-            fields: section.fields.map((variable: any) => {
+            fields: section?.fields.map((variable: any) => {
                 const copy = { ...variable };
                 return applyRulesToVariable(copy, values, idx!);
             }),
@@ -54,7 +54,7 @@ export const CustomDhis2RulesEngine = (props: RulesEngineProps) => {
     }
 
     function rulesEngineDataElements(variables: any[], values: Record<string, any>, idx?: number) {
-        const updated = variables.map((variable) => {
+        const updated = variables?.map((variable) => {
             const copy = { ...variable };
             return applyRulesToVariable(copy, values, idx);
         });
@@ -63,42 +63,40 @@ export const CustomDhis2RulesEngine = (props: RulesEngineProps) => {
     }
 
     function parseValue(value: any) {
-        if (value === undefined || value === null || value === '') {
+        if (value === undefined || value === null || value === '' || isNaN(value)) {
             return 'undefined';
         }
-
-        const lower = value.toLowerCase();
+        const str = String(value);
+        const lower = str.toLowerCase();
 
         if (lower === 'true') return true;
         if (lower === 'false') return false;
 
-        if (!isNaN(value) && value.trim() !== '') {
+        if (!isNaN(value) && str.trim() !== '') {
             return Number(value);
         }
-
-        return `'${value}'`;
+        return `'${str}'`;
     }
-
 
     function evaluateExpression(expression: any, context: any, values: any, programRulesVariables: any) {
         const d2 = createD2(context);
 
-        expression = expression.replace(/today\(\)/g, 'd2.today()');
-        expression = expression.replace(/d2:(\w+)/g, 'd2.$1');
-        expression = expression.replace(/V\{event_date\}/g, 'V{enrollment_date}');
+        expression = expression?.replace(/today\(\)/g, 'd2.today()');
+        expression = expression?.replace(/d2:(\w+)/g, 'd2.$1');
+        expression = expression?.replace(/V\{event_date\}/g, 'V{enrollment_date}');
 
-        expression = expression.replace(/#\{([^}]+)\}/g, (_: string, key: string) => {
-            const value = values[programRulesVariables[key]];
+        expression = expression?.replace(/#\{([^}]+)\}/g, (_: string, key: string) => {
+            const value = values?.[programRulesVariables[key]];
             return parseValue(value);
         });
 
-        expression = expression.replace(/A\{([^}]+)\}/g, (_: string, key: any) => {
-            const value = values[programRulesVariables[key]];
+        expression = expression?.replace(/A\{([^}]+)\}/g, (_: string, key: any) => {
+            const value = values?.[programRulesVariables[key]];
             return parseValue(value);
         });
 
-        expression = expression.replace(/V\{([^}]+)\}/g, (_: string, key: any) => {
-            const value = values[key];
+        expression = expression?.replace(/V\{([^}]+)\}/g, (_: string, key: any) => {
+            const value = values?.[key];
             return parseValue(value);
         });
 
@@ -130,6 +128,15 @@ export const CustomDhis2RulesEngine = (props: RulesEngineProps) => {
                 const d2 = new Date(date2) as unknown as number;
                 return Math.ceil(Math.abs(d2 - d1) / (1000 * 60 * 60 * 24));
             },
+            monthsBetween: (date1: any, date2: any) => {
+                const d1 = new Date(date1);
+                const d2 = new Date(date2);
+                let months = (d2.getFullYear() - d1.getFullYear()) * 12 + (d2.getMonth() - d1.getMonth());
+                if (d2.getDate() < d1.getDate()) {
+                    months--;
+                }
+                return months;
+            },
             addDays: (date: any, days: any) => {
                 const d = new Date(date);
                 d.setDate(d.getDate() + parseInt(days));
@@ -155,21 +162,21 @@ export const CustomDhis2RulesEngine = (props: RulesEngineProps) => {
     }
 
     function applyRulesToVariable(variable: any, values: Record<string, any>, idx?: number) {
-        for (const rule of newProgramRules.filter(x => x.variable === variable.id || x.variable === variable.section || x.programRuleActionType == 'DISPLAYTEXT')) {
-            const conditionResult = evaluateExpression(rule.condition, variable, values, programRulesVariables);
+        for (const rule of newProgramRules?.filter(x => x.variable === variable.id || x.variable === variable.section || x.programRuleActionType == 'DISPLAYTEXT')) {
+            const conditionResult = evaluateExpression(rule?.condition, variable, values, programRulesVariables);
 
             // console.log(rule)
-            switch (rule.programRuleActionType) {
+            switch (rule?.programRuleActionType) {
                 case 'DISPLAYTEXT':
                     setDisplayTextRule(prev => {
                         if (conditionResult && !prev.find(x => x.key === idx)) {
                             return [...prev, {
                                 key: idx,
-                                name: values[sessionStorage.getItem('nomeDoMembro') || ''],
-                                content: rule.content
+                                name: values?.[sessionStorage.getItem('nomeDoMembro') || ''],
+                                content: rule?.content
                             }];
                         } else if (!conditionResult) {
-                            return prev.filter(x => x.key !== idx);
+                            return prev?.filter(x => x.key !== idx) || [];
                         }
                         return prev
                     });
@@ -188,19 +195,19 @@ export const CustomDhis2RulesEngine = (props: RulesEngineProps) => {
 
                 case 'SHOWOPTIONGROUP':
                     if (conditionResult) {
-                        const options = getOptionGroups?.find(op => op.id === rule.optionGroup)?.options || [];
+                        const options = getOptionGroups?.find(op => op.id === rule?.optionGroup)?.options || [];
                         variable.options = { optionSet: { options } };
                     }
                     break;
 
                 case 'SHOWWARNING':
                     variable.warning = !!conditionResult;
-                    variable.content = conditionResult ? rule.content : '';
+                    variable.content = conditionResult ? rule?.content : '';
                     break;
 
                 case 'SHOWERROR':
                     variable.error = !!conditionResult;
-                    variable.content = conditionResult ? rule.content : '';
+                    variable.content = conditionResult ? rule?.content || '' : '';
                     break;
 
                 case 'HIDEFIELD':
@@ -212,23 +219,22 @@ export const CustomDhis2RulesEngine = (props: RulesEngineProps) => {
                     break;
 
                 case 'HIDESECTION':
-                    console.log(variable, 'ahaaaaaaa')
                     variable.disabled = !!conditionResult;
                     break;
 
                 case 'HIDEOPTIONGROUP':
                     if (conditionResult && conditionResult[0]?.organisationUnits?.some((x: any) => x.value === values.orgUnit)) {
                         const groupOptions = getOptionGroups?.find(op => op.id === rule.optionGroup)?.options || [];
-                        const initial = variable.initialOptions?.optionSet?.options || [];
+                        const initial = variable?.initialOptions?.optionSet?.options || [];
                         variable.options = {
                             optionSet: {
                                 options: (variable.optionSet?.options || initial).filter(
-                                    (o1: any) => !groupOptions.some((o2: any) => o2.value === o1.value),
+                                    (o1: any) => !groupOptions?.some((o2: any) => o2.value === o1.value),
                                 ),
                             },
                         };
-                    } else if (!conditionResult && variable.initialOptions?.optionSet?.options) {
-                        variable.options = { optionSet: { options: variable.initialOptions?.optionSet?.options || [] } };
+                    } else if (!conditionResult && variable?.initialOptions?.optionSet?.options) {
+                        variable.options = { optionSet: { options: variable?.initialOptions?.optionSet?.options || [] } };
                     }
                     break;
             }
