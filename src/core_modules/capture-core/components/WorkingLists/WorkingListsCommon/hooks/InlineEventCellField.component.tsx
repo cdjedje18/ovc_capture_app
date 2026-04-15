@@ -111,6 +111,7 @@ export const InlineEventCellField = React.memo(({
         setLocalValue(value ?? null);
     }, [value, column.id]);
 
+
     useEffect(() => {
         if (column.value !== null && column?.rowChanged && column?.rowChanged?.length > 0) {
             commit(column?.value);
@@ -252,7 +253,7 @@ export const InlineEventCellField = React.memo(({
         return (
             <div style={commonStyle}>
                 <TextField
-                    value={localValue ?? ''}
+                    value={(localValue != null && localValue != undefined) ? localValue?.toString() : ''}
                     onChange={handleNumericChange}
                     onBlur={handleNumericBlur}
                     disabled={disabled || column?.disabled}
@@ -266,7 +267,7 @@ export const InlineEventCellField = React.memo(({
     return (
         <div style={commonStyle}>
             <TextField
-                value={localValue ?? ''}
+                value={localValue?.toString() ?? ''}
                 onChange={setLocalValue}
                 onBlur={commit}
                 disabled={disabled || column?.disabled}

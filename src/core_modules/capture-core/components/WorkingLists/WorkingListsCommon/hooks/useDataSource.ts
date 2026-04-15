@@ -332,7 +332,6 @@ export const useDataSource = (
                     id,
                 };
                 setRowChanged('');
-                console.log(data)
                 return data;
             }), [
         records,
@@ -538,9 +537,9 @@ export const useDataSource = (
     return useMemo(() => {
         if (eventRecordsArray) return eventRecordsArray
             .map((eventRecord, rowIndex) => {
-                const activeRowOverride = ((recordOverrides[activeOverrideScopeKey] || {})[eventRecord.id] || {});
                 const headers = isMembersFormPage ? runRulesEngine!({ overrideValues: eventRecord, overrideVariables: columns, idx: rowIndex }) : columns;
 
+                // console.log(headers)
                 const listRecord = columns
                     .filter(column => column.visible)
                     .reduce((acc, column) => {
@@ -596,11 +595,13 @@ export const useDataSource = (
                                             const required: any = headers?.filter(x => x.required)
                                             const error: any = headers?.filter(x => x.error)
 
+                                            const conjunto = [...error, ...required]
+
                                             if (required?.length > 0 || error?.length > 0)
-                                                for (let req of required) {
+                                                for (let req of conjunto) {
                                                     if (!eventRecord[req.id]) {
                                                         show({
-                                                            message: `Preencha todos os campos`,
+                                                            message: `O campo "${req?.header}" é obrigatório!`,
                                                             type: { warning: true }
                                                         });
                                                         setTimeout(hide, 5000);

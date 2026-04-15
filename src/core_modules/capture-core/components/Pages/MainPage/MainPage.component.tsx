@@ -47,11 +47,11 @@ const MainPageComponentPlain = ({
         const dataEntryStage = data?.config?.entries?.find((x: any) => x.key == 'data_entry')?.value?.programs?.[0]?.programStage || ''
 
         if (nomeDoMembro) {
-            sessionStorage.setItem('nomeDoMembro', nomeDoMembro)
+            localStorage.setItem('nomeDoMembro', nomeDoMembro)
         }
 
         if (dataEntryStage) {
-            sessionStorage.setItem('dataEntryStage', dataEntryStage)
+            localStorage.setItem('dataEntryStage', dataEntryStage)
         }
     }
 

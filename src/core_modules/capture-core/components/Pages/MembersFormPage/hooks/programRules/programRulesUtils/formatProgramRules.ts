@@ -18,6 +18,8 @@ export function formatProgramRules(programRules: ProgramRuleConfig[]): Formatted
                 displayName: pRulesAction?.displayName,
                 id: pRulesAction?.id,
                 program: prules?.program?.id,
+                ruleId: prules.id,
+                priority: prules?.priority
             });
         }
     }

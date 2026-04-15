@@ -24,10 +24,10 @@ export const CustomDhis2RulesEngine = (props: RulesEngineProps) => {
     // ─── Helpers ────────────────────────────────────────────────────────────────
 
     const isMissing = (value: any) =>
-        value === null || value === undefined || value === '' || value === 'undefined';
+        value?.length === 0 || value === null || value === undefined || value === 'undefined' || value === "''";
 
     function parseValue(value: any): any {
-        if (value === undefined || value === null || value === '') return 'undefined';
+        if (value === undefined || value === null || value === '') return "''";
 
         const str = String(value).trim();
         const lower = str.toLowerCase();
@@ -61,7 +61,7 @@ export const CustomDhis2RulesEngine = (props: RulesEngineProps) => {
                 if (isMissing(date1) || isMissing(date2)) return null;
                 const d1 = new Date(date1) as unknown as number;
                 const d2 = new Date(date2) as unknown as number;
-                return Math.ceil(Math.abs(d2 - d1) / (1000 * 60 * 60 * 24));
+                return Math.ceil((d2 - d1) / (1000 * 60 * 60 * 24));
             },
 
             monthsBetween: (date1: any, date2: any) => {
@@ -133,7 +133,8 @@ export const CustomDhis2RulesEngine = (props: RulesEngineProps) => {
         expression: any,
         context: any,
         values: any,
-        rulesVariables: any
+        rulesVariables: any,
+        co?: boolean
     ): any {
         if (!expression) return null;
         const d2 = createD2(context);
@@ -142,18 +143,20 @@ export const CustomDhis2RulesEngine = (props: RulesEngineProps) => {
             .replace(/\n/g, ' ')
             .replace(/today\(\)/g, 'd2.today()')
             .replace(/d2:(\w+)/g, 'd2.$1')
-            .replace(/#\{([^}]+)\}/g, (_: string, key: string) =>
-                parseValue(values?.[rulesVariables[key]])
-            )
-            .replace(/A\{([^}]+)\}/g, (_: string, key: string) =>
-                parseValue(values?.[rulesVariables[key]])
-            )
+            .replace(/#\{([^}]+)\}/g, (a: string, key: string) => {
+                return parseValue(values?.[rulesVariables[key]])
+            })
+            .replace(/A\{([^}]+)\}/g, (_: string, key: string) => {
+                return parseValue(values?.[rulesVariables[key]])
+            })
             .replace(/V\{([^}]+)\}/g, (_: string, key: string) =>
                 parseValue(values?.[key])
             );
 
         try {
-            return new Function('d2', 'context', `return ${expr};`)(d2, context);
+            const result = new Function('d2', 'context', `return ${expr};`)(d2, context);
+            return result
+
         } catch (error) {
             console.error('Error evaluating expression:', expr, error);
             return null;
@@ -181,7 +184,7 @@ export const CustomDhis2RulesEngine = (props: RulesEngineProps) => {
                                 ...prev,
                                 {
                                     key: idx,
-                                    name: values?.[sessionStorage.getItem('nomeDoMembro') || ''],
+                                    name: values?.[localStorage.getItem('nomeDoMembro') || ''],
                                     content: rule?.content,
                                 },
                             ];
@@ -198,14 +201,36 @@ export const CustomDhis2RulesEngine = (props: RulesEngineProps) => {
                         const newValue = evaluateExpression(rule.data, variable, values, programRulesVariables);
                         values[variable.id] = newValue ?? '';
                         variable.value = newValue;
-                        variable.disabled = true;
+
+                        let shouldDisable = true;
+
+                        // Check if variable is used in condition
+                        rule?.condition?.replace(/#\{([^}]+)\}/g, (a: string, key: string) => {
+                            if (programRulesVariables[key] == variable.id) {
+                                shouldDisable = false;
+                            }
+                            return a;
+                        });
+
+                        // Check if variable is used in data
+                        rule?.data?.replace(/#\{([^}]+)\}/g, (a: string, key: string) => {
+                            if (programRulesVariables[key] == variable.id) {
+                                shouldDisable = false;
+                            }
+                            return a;
+                        });
+
+                        variable.disabled = shouldDisable;
+                        if (variable.id == 'sh8tmEJ0ltI') {
+                            console.log(rule,'éi');
+                        }
                     } else {
                         variable.value = null;
                     }
+
                     variable.rowChanged = rowChanged;
                     break;
                 }
-
                 case 'SHOWOPTIONGROUP': {
                     if (conditionMet) {
                         const options = getOptionGroups?.find((op: any) => op.id === rule?.optionGroup)?.options || [];
@@ -269,12 +294,15 @@ export const CustomDhis2RulesEngine = (props: RulesEngineProps) => {
     }
 
     function mapVariables(variables: any[], values: Record<string, any>, idx?: number) {
-        return variables?.map(variable => ({
-            ...variable,
-            ...(applyRulesToVariable({ ...variable }, values, idx)),
-        }));
-    }
+        return variables?.map(variable => {
+            const updated = applyRulesToVariable({ ...variable }, values, idx);
 
+            return {
+                ...variable,
+                ...updated
+            };
+        });
+    }
     // ─── Public ──────────────────────────────────────────────────────────────────
 
     function runRulesEngine(arg?: {
