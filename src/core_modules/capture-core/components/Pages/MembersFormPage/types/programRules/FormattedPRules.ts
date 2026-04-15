@@ -13,6 +13,7 @@ interface FormattedPRulesType {
     functionName?: string
     ruleId?: string
     priority?: string
+    
 }
 
 export enum PRulesTypes {
