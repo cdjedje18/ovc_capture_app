@@ -180,7 +180,7 @@ export const TopBar = ({ sourceProgramId, entryProgramId, orgUnitId, selectedCat
             onStartAgain={() => reset()}
         >
             <EventDateSelector
-                selectedValue={selectedMembersVisitDate}
+                selectedValue={selectedMembersVisitDate?.original}
                 options={eventDateOptions}
                 onSelect={setSelectedMembersVisitDate}
             />

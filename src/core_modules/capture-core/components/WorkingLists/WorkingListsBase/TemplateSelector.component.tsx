@@ -150,7 +150,7 @@ const TemplateSelectorPlain = ({
                         </div>
                         <CalendarInput
                             label=""
-                            date={selectedDate}
+                            date={selectedDate?.original}
                             calendar={calendarType}
                             format={format}
                             locale={locale}

@@ -1,5 +1,5 @@
 import React, { useMemo, type ComponentType } from 'react';
-import { colors, spacers } from '@dhis2/ui';
+import { colors, NoticeBox, spacers } from '@dhis2/ui';
 import { WithStyles, withStyles } from 'capture-core-utils/styles';
 import { cx } from '@emotion/css';
 import { bulkDataEntryBreadcrumbsKeys } from '../../../Breadcrumbs/BulkDataEntryBreadcrumb';
@@ -19,6 +19,9 @@ import {
 } from './InvalidCategoryCombinationForOrgUnitMessage/InvalidCategoryCombinationForOrgUnitMessage';
 import { NoSelectionsInfoBox } from './NoSelectionsInfoBox';
 import './membersFormPageBody.css';
+import { useRecoilValue } from 'recoil';
+import { displayTextRule } from '../schema/infoSchema';
+import { isMembersFormPage } from 'capture-core/components/WorkingLists/utils/isMembersFormPage';
 
 const styles: Readonly<any> = {
     listContainer: {
@@ -71,6 +74,7 @@ const MembersFormPageBodyPlain = ({
     bulkDataEntryTrackedEntityIds,
 }: Props) => {
     const { bulkDataEntryConfigurations } = useBulkDataEntryConfigurations(programId);
+    const displayText = useRecoilValue(displayTextRule);
 
     const showMainPage = useMemo(() => {
         const noProgramSelected = !programId;
@@ -110,6 +114,20 @@ const MembersFormPageBodyPlain = ({
                     {mainPageStatus === MainPageStatuses.SHOW_WORKING_LIST && (
                         <div className={classes.container} data-test={'main-page-working-list'}>
                             <div className={cx(classes.leftColumn, 'left-column-main-page')}>
+                                <div style={{maxHeight:"250px",overflow:"scroll"}} > 
+                                    {
+                                        (displayText?.length > 0 && isMembersFormPage()) && displayText.map((x, index) =>
+                                            <div style={{ marginBottom: "5px" }} key={index}>
+                                                <NoticeBox title={
+                                                    <span style={{ fontWeight: 400 }}>
+                                                        <span style={{ fontWeight: 700 }}>{x.name}:</span>
+                                                        &nbsp;{x.content}
+                                                    </span>
+                                                } />
+                                            </div>
+                                        )
+                                    }
+                                </div>
                                 <WorkingListsType
                                     programId={programId}
                                     orgUnitId={orgUnitId}

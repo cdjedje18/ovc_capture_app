@@ -104,8 +104,9 @@ const getEventsMetaDataConfig = (
         return [];
     }
 
+    const allElements = getDataValuesMetaDataConfig([...stageForm.getElements()], forceVisible, hideInColumnSelector);
     if (!selectedSectionId) {
-        return getDataValuesMetaDataConfig([...stageForm.getElements()], forceVisible, hideInColumnSelector);
+        return allElements;
     }
 
     const selectedSection = stageForm.getSection(selectedSectionId);
@@ -120,7 +121,15 @@ const getEventsMetaDataConfig = (
         return acc.concat(element);
     }, []);
 
-    return getDataValuesMetaDataConfig(dataElementsInSection, forceVisible, hideInColumnSelector);
+    const sectionFields = getDataValuesMetaDataConfig(dataElementsInSection, forceVisible, hideInColumnSelector)
+
+    allElements.forEach(field => {
+        if (!sectionFields.some(sectionField => sectionField.id === field.id)) {
+            field.visible = false;
+        }
+    })
+
+    return allElements;
 };
 
 const MEMBERS_FORM_VISIBLE_ATTRIBUTE_ID = 'PP0L2IEL4Dm';
@@ -142,18 +151,18 @@ const getTEIMetaDataConfig = (
         unique,
         searchOperator,
         minCharactersToSearch }) => ({
-        id,
-        visible: isMembersFormPage ? id === MEMBERS_FORM_VISIBLE_ATTRIBUTE_ID : displayInReports,
-        type,
-        header: formName || name,
-        options: optionSet && optionSet.options.map(({ text, value }) => ({ text, value })),
-        multiValueFilter: isMembersFormPage ? false : (!!optionSet || type === dataElementTypes.BOOLEAN),
-        filterHidden: isMembersFormPage ? id !== MEMBERS_FORM_VISIBLE_ATTRIBUTE_ID : !(orgUnitId || searchable || unique),
-        hideInColumnSelector: isMembersFormPage ? id !== MEMBERS_FORM_VISIBLE_ATTRIBUTE_ID : false,
-        unique: Boolean(unique),
-        searchOperator,
-        minCharactersToSearch,
-    }));
+            id,
+            visible: isMembersFormPage ? id === MEMBERS_FORM_VISIBLE_ATTRIBUTE_ID : displayInReports,
+            type,
+            header: formName || name,
+            options: optionSet && optionSet.options.map(({ text, value }) => ({ text, value })),
+            multiValueFilter: isMembersFormPage ? false : (!!optionSet || type === dataElementTypes.BOOLEAN),
+            filterHidden: isMembersFormPage ? id !== MEMBERS_FORM_VISIBLE_ATTRIBUTE_ID : !(orgUnitId || searchable || unique),
+            hideInColumnSelector: isMembersFormPage ? id !== MEMBERS_FORM_VISIBLE_ATTRIBUTE_ID : false,
+            unique: Boolean(unique),
+            searchOperator,
+            minCharactersToSearch,
+        }));
 
 const getDataValuesMetaDataConfig = (
     dataElements,
@@ -195,13 +204,21 @@ export const useDefaultColumnConfig = (
                     filterHidden: true,
                     hideInColumnSelector: true,
                     sortDisabled: true,
+                }, {
+                    id: 'actions',
+                    visible: true,
+                    type: dataElementTypes.TEXT,
+                    header: i18n.t('Acções'),
+                    filterHidden: true,
+                    hideInColumnSelector: true,
+                    sortDisabled: true,
                 }]
                 : []),
         ];
 
         if (programStageId && programStage) {
             const shouldForceVisibleDataElements = isMembersFormPage && !!selectedSectionId;
-            return defaultColumns.concat([
+            const stageCols = [
                 ...getProgramStageMainConfig(programStage, isMembersFormPage, false),
                 ...getEventsMetaDataConfig(
                     programStage,
@@ -209,7 +226,10 @@ export const useDefaultColumnConfig = (
                     shouldForceVisibleDataElements,
                     false,
                 ),
-            ]);
+            ]
+
+            return defaultColumns.concat(stageCols);
         }
+
         return defaultColumns;
     }, [orgUnitId, program, programStageId, selectedSectionId]);

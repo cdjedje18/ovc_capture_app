@@ -39,7 +39,7 @@ const shouldPreserveViewState = ({
 
 const useCurrentTemplate = (templates: any[], currentTemplateId?: string) => useMemo(() =>
     (currentTemplateId && templates.find(template => template.id === currentTemplateId)) || templates[0],
-[templates, currentTemplateId]);
+    [templates, currentTemplateId]);
 
 export const TrackerWorkingListsSetup = ({
     program,
@@ -98,13 +98,20 @@ export const TrackerWorkingListsSetup = ({
     const prevProgramStageId = useRef(effectiveProgramStageId);
     const prevTemplateId = useRef(currentTemplateId);
     const defaultColumns = useDefaultColumnConfig(program, orgUnitId, effectiveProgramStageId, selectedSectionIdForColumns);
+    let elementsWithSections: any = []
     const dataFetchingColumns = useDefaultColumnConfig(
         program,
         orgUnitId,
         effectiveProgramStageId,
         isMembersFormPage ? undefined : selectedSectionIdForColumns,
     );
-    const columns = useColumns<TrackerWorkingListsColumnConfigs>(customColumnOrder, defaultColumns);
+    program.stages.forEach(x => {
+        if (x._id === dataEntryProgramStageId) {
+            x._stageForm.sections.forEach(x => x.elements.forEach((ele: any) => elementsWithSections.push({ name: ele._name, id: ele._id, section: x._id })))
+        }
+    })
+    const columns = useColumns<TrackerWorkingListsColumnConfigs>(customColumnOrder, defaultColumns, elementsWithSections);
+
     const baseFiltersOnly = useFiltersOnly(program, effectiveProgramStageId);
     const baseProgramStageFiltersOnly = useProgramStageFilters(program, effectiveProgramStageId);
     const filtersOnly = useMemo(
@@ -252,7 +259,9 @@ export const TrackerWorkingListsSetup = ({
         (template: any) => onDeleteTemplate(template, program.id, listQueryProgramStageId),
         [onDeleteTemplate, program.id, listQueryProgramStageId],
     );
-    const dataSource = useDataSource(records, recordsOrder, columns, effectiveProgramStageId);
+
+    const dataSource = useDataSource(records, recordsOrder, columns, effectiveProgramStageId, program);
+
     const onLoadViewWithMeta = useInjectDataFetchingMetaToLoadList(
         dataFetchingColumns,
         filtersOnly,
@@ -265,7 +274,7 @@ export const TrackerWorkingListsSetup = ({
         programStageFiltersOnly,
         onUpdateList,
     );
-    const onRowClickNoop = useCallback(() => {}, []);
+    const onRowClickNoop = useCallback(() => { }, []);
 
     return (
         <WorkingListsBase

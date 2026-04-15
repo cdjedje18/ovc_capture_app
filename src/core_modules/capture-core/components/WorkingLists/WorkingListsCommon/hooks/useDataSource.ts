@@ -17,6 +17,8 @@ import {
 import { InlineEventCellField } from './InlineEventCellField.component';
 import { MEMBERS_CAPTURE_LINK_COLUMN_ID } from '../../TrackerWorkingLists/Setup/hooks/useDefaultColumnConfig';
 import { getFilterApiName } from '../../TrackerWorkingLists/helpers';
+import { CustomDhis2RulesEngine } from 'capture-core/components/Pages/MembersFormPage/hooks/programRules/rules-engine/RulesEngine';
+import useShowAlerts from 'capture-core/components/Pages/MembersFormPage/hooks/common/useShowAlert';
 
 const TRACKER_EVENT_MUTATION: Mutation = {
     resource: 'tracker?async=false&importStrategy=CREATE_AND_UPDATE',
@@ -54,7 +56,6 @@ const SELECTED_DATE_EVENTS_QUERY: any = {
 const getOccurredAtDate = (occurredAt?: string) => occurredAt?.slice(0, 10);
 const DEFAULT_OVERRIDE_SCOPE = '__default';
 const getJoinedTeiIds = (teiIds: Array<string>) => teiIds.join(featureAvailable(FEATURES.newUIDsSeparator) ? ',' : ';');
-const getFieldSaveStatusKey = (rowId: string, columnId: string) => `${rowId}:${columnId}`;
 
 const throwIfTrackerMutationFailed = (response: any) => {
     const normalizedResponse = response?.response || response?.details || response;
@@ -84,7 +85,7 @@ const hasEventForSelectedDate = ({
     selectedMembersVisitDate?: string,
     occurredAt?: string,
 }) => !isMembersFormPage
-    || !selectedMembersVisitDate
+|| !selectedMembersVisitDate
     || getOccurredAtDate(occurredAt) === selectedMembersVisitDate;
 
 const getEventMetadata = (eventRecord: { [key: string]: any }) => ({
@@ -131,11 +132,15 @@ const getOccurredAtWithCurrentTime = (selectedDate?: string) => {
         return now.format('YYYY-MM-DDTHH:mm:ss.SSS');
     }
 
-    const normalizedDate = selectedDate.slice(0, 10);
-    return moment(
-        `${normalizedDate}T${now.format('HH:mm:ss.SSS')}`,
-        'YYYY-MM-DDTHH:mm:ss.SSS',
-    ).format('YYYY-MM-DDTHH:mm:ss.SSS');
+    const date = moment(selectedDate, ['DD-MM-YYYY', 'YYYY-MM-DD'], true);
+
+    return date
+        .set({
+            hour: now.hour(),
+            minute: now.minute(),
+            second: now.second(),
+            millisecond: now.millisecond(),
+        }).format('YYYY-MM-DDTHH:mm:ss.SSS');
 };
 
 const getOccurredAtForSave = ({
@@ -268,10 +273,11 @@ export const useDataSource = (
         [key: string]: any,
     }>,
     currentProgramStageId?: string,
+    program?: any,
 ) => {
     const isMembersFormPage = isMembersFormPageRoute();
     const selectedMembersVisitDate = useSelectedMembersVisitDate();
-    const isMembersFormLocked = isMembersFormPage && !selectedMembersVisitDate;
+    const isMembersFormLocked = isMembersFormPage && !selectedMembersVisitDate?.normalized;
     const { baseUrl } = useConfig();
     const {
         refetch: refetchSelectedDateEvents,
@@ -280,11 +286,10 @@ export const useDataSource = (
     } = useDataQuery(SELECTED_DATE_EVENTS_QUERY, { lazy: true });
     const [saveEventMutation] = useDataMutation(TRACKER_EVENT_MUTATION);
     const [recordOverrides, setRecordOverrides] = useState<{ [key: string]: { [key: string]: any } }>({});
-    const [fieldSaveStatusById, setFieldSaveStatusById] = useState<Record<string, 'idle' | 'saving' | 'success' | 'error'>>({});
-    const fieldSaveTimeoutsRef = useRef<Record<string, number>>({});
+    const [rowChanged, setRowChanged] = useState<string>('');
     const activeOverrideScopeKey = getOverrideScopeKey({
         isMembersFormPage,
-        selectedMembersVisitDate,
+        selectedMembersVisitDate: selectedMembersVisitDate?.normalized,
     });
     const fetchedSelectedDateEventsByTei = useMemo(() => {
         const selectedDateEventsResults = selectedDateEventsData?.results as any;
@@ -292,47 +297,48 @@ export const useDataSource = (
         return getLatestEventByTrackedEntity(events);
     }, [selectedDateEventsData]);
     const selectedDateEventsByTei = useMemo(() => {
-        if (!isMembersFormPage || !selectedMembersVisitDate) {
+        if (!isMembersFormPage || !selectedMembersVisitDate?.normalized) {
             return undefined;
         }
 
         return fetchedSelectedDateEventsByTei;
-    }, [fetchedSelectedDateEventsByTei, isMembersFormPage, selectedMembersVisitDate]);
+    }, [fetchedSelectedDateEventsByTei, isMembersFormPage, selectedMembersVisitDate?.normalized]);
+
+    const { runRulesEngine } = isMembersFormPage ? CustomDhis2RulesEngine({ program: program._id, type: 'programStage', rowChanged }) : {};
+    const rowValueRef = useRef({});
+    const { hide, show } = useShowAlerts()
+
     const eventRecordsArray = useMemo(() =>
         recordsOrder && records && recordsOrder
-            .map(id => ({
-                ...records[id],
-                ...(isMembersFormPage && selectedMembersVisitDate && selectedDateEventsByTei ? (() => {
-                    const selectedDateEvent = selectedDateEventsByTei[records[id]?.[EVENT_METADATA_KEYS.teiId] || id];
-                    const selectedDateEventValues = (selectedDateEvent?.dataValues || []).reduce((acc, dataValue) => {
-                        acc[dataValue.dataElement] = dataValue.value;
-                        return acc;
-                    }, {});
-
-                    return columns
-                        .filter(column => column.additionalColumn)
-                        .reduce((acc, column) => {
-                            const rawValue = column.mainProperty
-                                ? selectedDateEvent?.[getFilterApiName(column.id)]
-                                : selectedDateEventValues[column.id];
-
-                            acc[column.id] = rawValue == null ? undefined : convertServerToClient(rawValue, column.type);
+            .map((id) => {
+                const data = {
+                    ...records[id],
+                    ...(isMembersFormPage && selectedMembersVisitDate?.normalized && selectedDateEventsByTei ? (() => {
+                        const selectedDateEvent = selectedDateEventsByTei[records[id]?.[EVENT_METADATA_KEYS.teiId] || id];
+                        const selectedDateEventValues = (selectedDateEvent?.dataValues || []).reduce((acc, dataValue) => {
+                            acc[dataValue.dataElement] = dataValue.value;
                             return acc;
-                        }, {
+                        }, {});
+
+                        return {
                             [EVENT_METADATA_KEYS.eventId]: selectedDateEvent?.event,
                             [EVENT_METADATA_KEYS.occurredAt]: selectedDateEvent?.occurredAt,
                             [EVENT_METADATA_KEYS.syntheticForSelectedDate]: false,
-                        });
-                })() : {}),
-                ...((recordOverrides[activeOverrideScopeKey] || {})[id] || {}),
-                id,
-            })), [
+                            ...selectedDateEventValues,
+                        };
+                    })() : {}),
+                    ...((recordOverrides[activeOverrideScopeKey] || {})[id] || {}),
+                    id,
+                };
+                setRowChanged('');
+                return data;
+            }), [
         records,
         recordsOrder,
         recordOverrides,
         activeOverrideScopeKey,
         isMembersFormPage,
-        selectedMembersVisitDate,
+        selectedMembersVisitDate?.normalized,
         selectedDateEventsByTei,
         columns,
     ]);
@@ -343,15 +349,15 @@ export const useDataSource = (
             return undefined;
         }
 
-        setLoadingSelectedDateEvents(Boolean(selectedMembersVisitDate && selectedDateEventsLoading));
+        setLoadingSelectedDateEvents(Boolean(selectedMembersVisitDate?.normalized && selectedDateEventsLoading));
 
         return () => {
             setLoadingSelectedDateEvents(false);
         };
-    }, [isMembersFormPage, selectedDateEventsLoading, selectedMembersVisitDate]);
+    }, [isMembersFormPage, selectedDateEventsLoading, selectedMembersVisitDate?.normalized]);
 
     React.useEffect(() => {
-        if (!isMembersFormPage || !selectedMembersVisitDate || !recordsOrder?.length || !records) {
+        if (!isMembersFormPage || !selectedMembersVisitDate?.normalized || !recordsOrder?.length || !records) {
             return;
         }
 
@@ -370,11 +376,11 @@ export const useDataSource = (
             programId,
             programStageId,
             trackedEntityIds: getJoinedTeiIds(trackedEntityIds),
-            selectedDate: selectedMembersVisitDate,
+            selectedDate: selectedMembersVisitDate?.normalized,
         });
     }, [
         isMembersFormPage,
-        selectedMembersVisitDate,
+        selectedMembersVisitDate?.normalized,
         records,
         recordsOrder,
         refetchSelectedDateEvents,
@@ -384,42 +390,26 @@ export const useDataSource = (
     const persistEventCellValue = useCallback(async ({
         eventRecord,
         column,
-        nextClientValue,
+        row
     }: {
         eventRecord: { [key: string]: any },
         column: { id: string, type: keyof typeof dataElementTypes },
-        nextClientValue: any,
+        row: any
     }) => {
-        const existingClientValue = eventRecord[column.id];
-        if (existingClientValue === nextClientValue) {
-            return;
-        }
-        if (isMembersFormPage && !selectedMembersVisitDate) {
-            return;
-        }
+        const rowId = eventRecord.id;
 
-        const {
-            eventId,
-            teiId,
-            enrollmentId,
-            orgUnitId,
-            programId,
-            programStageId: recordProgramStageId,
-            occurredAt: existingOccurredAt,
-        } = getEventMetadata(eventRecord);
+        if (isMembersFormPage && !selectedMembersVisitDate?.normalized) return;
+
+        const { eventId, teiId, enrollmentId, orgUnitId, programId, programStageId: recordProgramStageId, occurredAt: existingOccurredAt } = getEventMetadata(eventRecord);
+
         const programStageId = currentProgramStageId || recordProgramStageId;
         const shouldReuseExistingEvent = Boolean(eventId) && hasEventForSelectedDate({
             isMembersFormPage,
-            selectedMembersVisitDate,
+            selectedMembersVisitDate: selectedMembersVisitDate?.normalized,
             occurredAt: existingOccurredAt,
         });
         const targetExistingEventId = shouldReuseExistingEvent ? eventId : undefined;
         const targetExistingOccurredAt = shouldReuseExistingEvent ? existingOccurredAt : undefined;
-        const overrideScopeKey = getOverrideScopeKey({
-            isMembersFormPage,
-            selectedMembersVisitDate,
-            existingOccurredAt: targetExistingOccurredAt,
-        });
 
         if (!teiId || !enrollmentId || !orgUnitId || !programId || !programStageId) {
             log.warn(
@@ -435,16 +425,12 @@ export const useDataSource = (
             return;
         }
 
-        const serverValue = nextClientValue === ''
-            ? ''
-            : convertClientToServer(nextClientValue, column.type);
-        const targetEventId = targetExistingEventId || generateUID();
+        const targetEventId = rowValueRef.current?.[row]?.[EVENT_METADATA_KEYS.eventId] || targetExistingEventId || generateUID();
         const nextOccurredAt = getOccurredAtForSave({
             eventId: targetExistingEventId,
             existingOccurredAt: targetExistingOccurredAt,
-            selectedMembersVisitDate,
+            selectedMembersVisitDate: selectedMembersVisitDate?.normalized,
         });
-        const rowId = eventRecord.id;
 
         if (targetExistingEventId && !nextOccurredAt) {
             log.warn(
@@ -457,65 +443,14 @@ export const useDataSource = (
             return;
         }
 
-        const overridePatch = {
-            [column.id]: nextClientValue,
-            ...(!targetExistingEventId ? {
-                [EVENT_METADATA_KEYS.eventId]: targetEventId,
-                [EVENT_METADATA_KEYS.occurredAt]: nextOccurredAt,
-                [EVENT_METADATA_KEYS.syntheticForSelectedDate]: true,
-            } : {}),
-        };
-        const fieldSaveStatusKey = getFieldSaveStatusKey(rowId, column.id);
-        const clearFieldStatusTimeout = () => {
-            const timeoutId = fieldSaveTimeoutsRef.current[fieldSaveStatusKey];
-            if (timeoutId) {
-                window.clearTimeout(timeoutId);
-                delete fieldSaveTimeoutsRef.current[fieldSaveStatusKey];
-            }
-        };
-        const setFieldSaveStatus = (status: 'saving' | 'success' | 'error') => {
-            setFieldSaveStatusById(currentStatus => ({
-                ...currentStatus,
-                [fieldSaveStatusKey]: status,
-            }));
-        };
-        const scheduleFieldSaveStatusReset = (status: 'success' | 'error', timeoutMs: number) => {
-            clearFieldStatusTimeout();
-            fieldSaveTimeoutsRef.current[fieldSaveStatusKey] = window.setTimeout(() => {
-                delete fieldSaveTimeoutsRef.current[fieldSaveStatusKey];
-                setFieldSaveStatusById((currentStatus) => {
-                    if (currentStatus[fieldSaveStatusKey] !== status) {
-                        return currentStatus;
-                    }
-
-                    return {
-                        ...currentStatus,
-                        [fieldSaveStatusKey]: 'idle',
-                    };
-                });
-            }, timeoutMs);
-        };
-
-        clearFieldStatusTimeout();
-        setFieldSaveStatus('saving');
-        fieldSaveTimeoutsRef.current[fieldSaveStatusKey] = window.setTimeout(() => {
-            delete fieldSaveTimeoutsRef.current[fieldSaveStatusKey];
-            setFieldSaveStatusById((currentStatus) => {
-                if (currentStatus[fieldSaveStatusKey] !== 'saving') {
-                    return currentStatus;
-                }
-
-                return {
-                    ...currentStatus,
-                    [fieldSaveStatusKey]: 'error',
-                };
-            });
-        }, 5000);
-
-        setRecordOverrides(currentOverrides =>
-            applyRecordOverridePatch(currentOverrides, overrideScopeKey, rowId, overridePatch));
-
         try {
+            const { [EVENT_METADATA_KEYS.eventId]: _, ...rest } = rowValueRef?.current?.[row] || {};
+            const dataElements = Object.entries(rest)
+                .map(([id, value]) => ({
+                    dataElement: id,
+                    value,
+                }));
+
             const mutationResponse = await saveEventMutation({
                 events: [{
                     event: targetEventId,
@@ -526,33 +461,40 @@ export const useDataSource = (
                     programStage: programStageId,
                     status: 'ACTIVE',
                     occurredAt: nextOccurredAt,
-                    dataValues: [{
-                        dataElement: column.id,
-                        value: serverValue,
-                    }],
+                    dataValues: dataElements,
                 }],
             });
+
+            if (!eventId) {
+                const nextRowValue = {
+                    ...rowValueRef.current,
+                    [row]: {
+                        ...(rowValueRef.current[row] || {}),
+                        [EVENT_METADATA_KEYS.eventId]: targetEventId,
+                    },
+                }
+                rowValueRef.current = nextRowValue;
+            }
+
+            recordOverride({
+                eventRecord,
+                column,
+                value: { loading: false, ...rowValueRef?.current?.[row] },
+                object: true
+            })
+
+            show({
+                message: `Dados gravados com sucesso`,
+                type: { success: true }
+            });
+            setTimeout(hide, 5000);
             throwIfTrackerMutationFailed(mutationResponse);
-            setFieldSaveStatus('success');
-            scheduleFieldSaveStatusReset('success', 1800);
         } catch (error) {
-            setFieldSaveStatus('error');
-            scheduleFieldSaveStatusReset('error', 2500);
-            setRecordOverrides(currentOverrides => revertRecordOverridePatch({
-                currentOverrides,
-                scopeKey: overrideScopeKey,
-                rowId,
-                columnId: column.id,
-                existingClientValue,
-                eventId: targetExistingEventId,
-            }));
-            log.error(
-                errorCreator('Could not persist inline event value')({
-                    error,
-                    columnId: column.id,
-                    rowId,
-                }),
-            );
+            show({
+                message: `Ocorreu um erro ao gravar os dados`,
+                type: { critical: true }
+            });
+            setTimeout(hide, 5000);
             return;
         }
 
@@ -561,105 +503,179 @@ export const useDataSource = (
             eventRecord[EVENT_METADATA_KEYS.occurredAt] = nextOccurredAt;
             eventRecord[EVENT_METADATA_KEYS.syntheticForSelectedDate] = true;
         }
-    }, [currentProgramStageId, isMembersFormPage, saveEventMutation, selectedMembersVisitDate]);
+    }, [currentProgramStageId, isMembersFormPage, saveEventMutation, selectedMembersVisitDate?.normalized]);
 
-    return useMemo(() => eventRecordsArray && eventRecordsArray
-        .map((eventRecord) => {
-            const activeRowOverride = ((recordOverrides[activeOverrideScopeKey] || {})[eventRecord.id] || {});
-            const listRecord = columns
-                .filter(column => column.visible)
-                .reduce((acc, column) => {
-                    const { id, type, options, resolveValue } = column;
-                    const isSelectedDateMatch = hasEventForSelectedDate({
-                        isMembersFormPage,
-                        selectedMembersVisitDate,
-                        occurredAt: eventRecord[EVENT_METADATA_KEYS.occurredAt],
-                    });
-                    const isSyntheticEventForSelectedDate = Boolean(eventRecord[EVENT_METADATA_KEYS.syntheticForSelectedDate]);
-                    const shouldBlankEventValue = isMembersFormPage
-                        && (
-                            !isSelectedDateMatch
-                            || (isSyntheticEventForSelectedDate && activeRowOverride[id] === undefined)
-                        )
-                        && (column.additionalColumn || column.mainProperty);
-                    const clientValue = shouldBlankEventValue ? undefined : eventRecord[id];
-                    if (isMembersFormPage && id === MEMBERS_CAPTURE_LINK_COLUMN_ID) {
-                        const captureEnrollmentUrl = getCaptureEnrollmentUrl({
-                            baseUrl,
-                            enrollmentId: eventRecord[EVENT_METADATA_KEYS.enrollmentId],
-                            orgUnitId: eventRecord[EVENT_METADATA_KEYS.orgUnitId],
-                            programId: eventRecord[EVENT_METADATA_KEYS.programId],
-                            teiId: eventRecord[EVENT_METADATA_KEYS.teiId],
-                        });
+    const recordOverride = ({
+        eventRecord,
+        column,
+        value,
+        object = false,
+    }: {
+        eventRecord: { [key: string]: any },
+        column: { id: string, type: keyof typeof dataElementTypes },
+        value: any,
+        object?: boolean,
+    }) => {
 
-                        acc[id] = captureEnrollmentUrl
-                            ? React.createElement(
-                                'a',
-                                {
-                                    href: captureEnrollmentUrl,
-                                    target: '_blank',
-                                    rel: 'noopener noreferrer',
-                                },
-                                React.createElement(Button, { small: true }, 'Detalhes'),
-                            )
-                            : null;
-                        return acc;
-                    }
+        const overrideScopeKey = getOverrideScopeKey({
+            isMembersFormPage,
+            selectedMembersVisitDate: selectedMembersVisitDate?.normalized,
+        });
+        const rowId = eventRecord.id;
+        setRowChanged(rowId);
 
-                    if (isMembersFormPage && column.additionalColumn) {
-                        acc[id] = React.createElement(InlineEventCellField, {
-                            key: `${eventRecord.id}-${id}`,
-                            column,
-                            value: clientValue,
-                            disabled: isMembersFormLocked,
-                            saveStatus: fieldSaveStatusById[getFieldSaveStatusKey(eventRecord.id, id)] || 'idle',
-                            onCommit: (nextClientValue: any) => {
-                                void persistEventCellValue({
-                                    eventRecord,
-                                    column,
-                                    nextClientValue,
-                                });
-                            },
-                        });
-                        return acc;
-                    }
+        const overridePatch = object ? {
+            ...value
+        } : {
+            [column.id]: value,
+        }
 
-                    if (resolveValue) {
-                        acc[id] = resolveValue()[clientValue];
-                    } else if (options) {
-                        if (type === dataElementTypes.MULTI_TEXT) {
-                            const dataElement = createDataElement(column);
-                            acc[id] = convertClientToList(clientValue, type, dataElement);
-                        } else {
-                            // TODO: Need is equal comparer for types because `sourceValue` and `option` can be an object
-                            // for example (for some data element types) and we can't do strict comparison.
-                            const option = options.find(o => o.value === clientValue);
-                            if (!option) {
-                                log.error(
-                                    errorCreator(
-                                        'Missing value in options')(
-                                        { id, clientValue, options }),
-                                );
-                                acc[id] = convertClientToList(clientValue, type);
-                            } else {
-                                acc[id] = option.text;
-                            }
+        setRecordOverrides(currentOverrides => applyRecordOverridePatch(currentOverrides, overrideScopeKey, rowId, overridePatch));
+    };
+
+    return useMemo(() => {
+        if (eventRecordsArray) return eventRecordsArray
+            .map((eventRecord, rowIndex) => {
+                const activeRowOverride = ((recordOverrides[activeOverrideScopeKey] || {})[eventRecord.id] || {});
+                const headers = isMembersFormPage ? runRulesEngine!({ overrideValues: eventRecord, overrideVariables: columns, idx: rowIndex }) : columns;
+
+                const listRecord = columns
+                    .filter(column => column.visible)
+                    .reduce((acc, column) => {
+                        const { id, type, options, resolveValue } = column;
+                        // const isSelectedDateMatch = hasEventForSelectedDate({
+                        //     isMembersFormPage,
+                        //     selectedMembersVisitDate: selectedMembersVisitDate?.normalized,
+                        //     occurredAt: eventRecord[EVENT_METADATA_KEYS.occurredAt],
+                        // });
+                        // const isSyntheticEventForSelectedDate = Boolean(eventRecord[EVENT_METADATA_KEYS.syntheticForSelectedDate]);
+                        // const shouldBlankEventValue = isMembersFormPage
+                        //     && (
+                        //         !isSelectedDateMatch
+                        //         || (isSyntheticEventForSelectedDate && activeRowOverride[id] === undefined)
+                        //     )
+                        //     && (column.additionalColumn || column.mainProperty);
+                        const clientValue = /*shouldBlankEventValue ? undefined :*/ eventRecord[id];
+
+                        if (isMembersFormPage && id === MEMBERS_CAPTURE_LINK_COLUMN_ID) {
+                            const captureEnrollmentUrl = getCaptureEnrollmentUrl({
+                                baseUrl,
+                                enrollmentId: eventRecord[EVENT_METADATA_KEYS.enrollmentId],
+                                orgUnitId: eventRecord[EVENT_METADATA_KEYS.orgUnitId],
+                                programId: eventRecord[EVENT_METADATA_KEYS.programId],
+                                teiId: eventRecord[EVENT_METADATA_KEYS.teiId],
+                            });
+
+                            acc[id] = captureEnrollmentUrl
+                                ? React.createElement(
+                                    'a',
+                                    {
+                                        href: captureEnrollmentUrl,
+                                        target: '_blank',
+                                        rel: 'noopener noreferrer',
+                                    },
+                                    React.createElement(Button, { small: true }, 'Detalhes'),
+                                )
+                                : null;
+                            return acc;
                         }
-                    } else {
-                        acc[id] = convertClientToList(clientValue, type);
-                    }
-                    return acc;
-                }, {});
 
-            return {
-                ...listRecord,
-                id: eventRecord.id, // used as rowkey
-            };
-        }), [
+                        if (isMembersFormPage && id === 'actions') {
+                            acc[id] = React.createElement(
+                                'div',
+                                { style: { display: 'flex', gap: '8px' } },
+                                React.createElement(
+                                    Button,
+                                    {
+                                        small: true,
+                                        loading: eventRecord?.loading,
+                                        disabled: !Boolean(rowValueRef.current?.[rowIndex]),
+                                        onClick: () => {
+                                            const required: any = headers?.filter(x => x.required)
+                                            const error: any = headers?.filter(x => x.error)
+
+                                            if (required?.length > 0 || error?.length > 0)
+                                                for (let req of required) {
+                                                    if (!eventRecord[req.id]) {
+                                                        show({
+                                                            message: `Preencha todos os campos`,
+                                                            type: { warning: true }
+                                                        });
+                                                        setTimeout(hide, 5000);
+
+                                                        return;
+                                                    }
+                                                }
+
+                                            recordOverride({ eventRecord, column, value: { loading: true }, object: true })
+                                            void persistEventCellValue({ eventRecord, column, row: rowIndex })
+                                        }
+                                    },
+                                    '💾 Gravar'
+                                )
+                            )
+
+                            return acc;
+                        }
+
+                        if (isMembersFormPage && column.additionalColumn) {
+                            const thisHeader = headers?.find(x => x.id == column.id);
+                            acc[id] = React.createElement(InlineEventCellField, {
+                                key: `${eventRecord.id}-${id}`,
+                                column: thisHeader,
+                                value: clientValue,
+                                ...((isMembersFormLocked || eventRecord.loading) ? { disabled: (isMembersFormLocked || eventRecord.loading) } : {}),
+                                saveStatus: 'idle',
+                                onCommit: (nextClientValue: any) => {
+                                    recordOverride({ eventRecord, column, value: nextClientValue })
+
+                                    const nextRowValue = {
+                                        ...rowValueRef.current,
+                                        [rowIndex]: {
+                                            ...(rowValueRef.current[rowIndex] || {}),
+                                            [column.id]: nextClientValue,
+                                        },
+                                    }
+                                    rowValueRef.current = nextRowValue;
+                                },
+                            });
+                            return acc;
+                        }
+
+                        if (resolveValue) {
+                            acc[id] = resolveValue()[clientValue];
+                        } else if (options) {
+                            if (type === dataElementTypes.MULTI_TEXT) {
+                                const dataElement = createDataElement(column);
+                                acc[id] = convertClientToList(clientValue, type, dataElement);
+                            } else {
+                                // TODO: Need is equal comparer for types because `sourceValue` and `option` can be an object
+                                // for example (for some data element types) and we can't do strict comparison.
+                                const option = options.find(o => o.value === clientValue);
+                                if (!option) {
+                                    log.error(
+                                        errorCreator('Missing value in options')({ id, clientValue, options }),
+                                    );
+                                    acc[id] = convertClientToList(clientValue, type);
+                                } else {
+                                    acc[id] = option.text;
+                                }
+                            }
+                        } else {
+                            acc[id] = convertClientToList(clientValue, type);
+                        }
+                        return acc;
+                    }, {});
+
+                return {
+                    ...listRecord,
+                    id: eventRecord.id, // used as rowkey
+                };
+            })
+    }, [
         eventRecordsArray,
         columns,
         baseUrl,
-        fieldSaveStatusById,
         isMembersFormPage,
         isMembersFormLocked,
         persistEventCellValue,

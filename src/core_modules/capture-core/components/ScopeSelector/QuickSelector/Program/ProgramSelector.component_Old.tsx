@@ -77,7 +77,7 @@ const ProgramSelectorPlain = ({
         return null;
     };
 
-    console.log({ programsArray })
+    console.log({ programsArray });
 
     return (
         <>

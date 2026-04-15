@@ -1,9 +1,9 @@
-import React from 'react';
-import { SelectorBar } from '@dhis2/ui';
+import { Button, IconArrowLeft16, SelectorBar } from '@dhis2/ui';
 import { ProgramSelector } from './Program/ProgramSelector.component';
 import { OrgUnitSelector } from './OrgUnitSelector.component';
 import type { Props } from './QuickSelector.types';
 import { isMembersFormPage as isMembersFormPageRoute } from '../../WorkingLists/utils/isMembersFormPage';
+import { useNavigate } from 'capture-core/utils/routing';
 
 export const QuickSelector = ({
     selectedOrgUnitId,
@@ -25,11 +25,17 @@ export const QuickSelector = ({
     orgUnitTooltip,
 }: Props) => {
     const isMembersFormPage = isMembersFormPageRoute();
+    const { navigate } = useNavigate()
 
     return (
         <SelectorBar
             disableClearSelections={isMembersFormPage || (!selectedProgramId && !selectedOrgUnitId)}
             onClearSelectionClick={!isMembersFormPage ? () => onStartAgain() : undefined}
+            additionalContent={
+                isMembersFormPage ? <div style={{ margin: "5px" }} >
+                    <Button icon={<IconArrowLeft16/>} small onClick={() => navigate('-1')} >Voltar</Button>
+                </div> : <></>
+            }
         >
             <ProgramSelector
                 selectedProgramId={selectedProgramId}

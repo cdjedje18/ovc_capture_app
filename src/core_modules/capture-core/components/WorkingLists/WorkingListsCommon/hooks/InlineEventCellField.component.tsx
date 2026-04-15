@@ -13,9 +13,15 @@ type Props = {
         id: string;
         type: string;
         options?: Array<{ text: string, value: any }> | null;
+        disabled?: boolean
+        value?: any
+        rowChanged?: string
+        required?: boolean
+        error?: boolean
+        content?: string
     };
     value: any;
-    onCommit: (value: any) => void;
+    onCommit: (value: any, handledByRule?: boolean) => void;
     disabled?: boolean;
     saveStatus?: 'idle' | 'saving' | 'success' | 'error';
 };
@@ -39,18 +45,18 @@ const isValidNumericDraft = (value: string, type: string) => {
     }
 
     switch (type) {
-    case dataElementTypes.NUMBER:
-        return /^-?\d*(?:[.]\d*)?$/.test(value);
-    case dataElementTypes.INTEGER:
-        return /^-?\d*$/.test(value);
-    case dataElementTypes.INTEGER_POSITIVE:
-        return /^\d*$/.test(value) && value !== '0';
-    case dataElementTypes.INTEGER_NEGATIVE:
-        return /^-\d*$/.test(value);
-    case dataElementTypes.INTEGER_ZERO_OR_POSITIVE:
-        return /^\d*$/.test(value);
-    default:
-        return true;
+        case dataElementTypes.NUMBER:
+            return /^-?\d*(?:[.]\d*)?$/.test(value);
+        case dataElementTypes.INTEGER:
+            return /^-?\d*$/.test(value);
+        case dataElementTypes.INTEGER_POSITIVE:
+            return /^\d*$/.test(value) && value !== '0';
+        case dataElementTypes.INTEGER_NEGATIVE:
+            return /^-\d*$/.test(value);
+        case dataElementTypes.INTEGER_ZERO_OR_POSITIVE:
+            return /^\d*$/.test(value);
+        default:
+            return true;
     }
 };
 
@@ -64,18 +70,18 @@ const isValidNumericCommit = (value: string, type: string) => {
     }
 
     switch (type) {
-    case dataElementTypes.NUMBER:
-        return /^-?\d+(?:[.]\d+)?$/.test(value);
-    case dataElementTypes.INTEGER:
-        return /^-?\d+$/.test(value);
-    case dataElementTypes.INTEGER_POSITIVE:
-        return /^[1-9]\d*$/.test(value);
-    case dataElementTypes.INTEGER_NEGATIVE:
-        return /^-\d+$/.test(value);
-    case dataElementTypes.INTEGER_ZERO_OR_POSITIVE:
-        return /^\d+$/.test(value) || value === '0';
-    default:
-        return true;
+        case dataElementTypes.NUMBER:
+            return /^-?\d+(?:[.]\d+)?$/.test(value);
+        case dataElementTypes.INTEGER:
+            return /^-?\d+$/.test(value);
+        case dataElementTypes.INTEGER_POSITIVE:
+            return /^[1-9]\d*$/.test(value);
+        case dataElementTypes.INTEGER_NEGATIVE:
+            return /^-\d+$/.test(value);
+        case dataElementTypes.INTEGER_ZERO_OR_POSITIVE:
+            return /^\d+$/.test(value) || value === '0';
+        default:
+            return true;
     }
 };
 
@@ -104,6 +110,13 @@ export const InlineEventCellField = React.memo(({
     useEffect(() => {
         setLocalValue(value ?? null);
     }, [value, column.id]);
+
+    useEffect(() => {
+        if (column.value !== null && column?.rowChanged && column?.rowChanged?.length > 0) {
+            commit(column?.value);
+            // onCommit(column?.value, true);
+        }
+    }, [column.value]);
 
     const optionSetOptions = useMemo(
         () => (column.options || []).map(option => ({
@@ -144,24 +157,18 @@ export const InlineEventCellField = React.memo(({
     }, [column.type, commit, disabled, value]);
 
     const commonStyle = { minWidth: 180 };
-    const statusNode = saveStatus !== 'idle'
+    const showMessage = column.required && (!value && !localValue);
+    const statusNode = (saveStatus !== 'idle' || showMessage || column?.error)
         ? (
             <div
                 style={{
                     fontSize: 12,
-                    marginTop: 4,
-                    color: saveStatus === 'error'
-                        ? '#d32f2f'
-                        : saveStatus === 'success'
-                            ? '#18c23d'
-                            : '#dcc414',
+                    fontWeight: 500,
+                    marginTop: 6,
+                    color: (saveStatus === 'error' || showMessage || column?.error) ? '#ff0000' : saveStatus === 'success' ? '#18c23d' : '#dcc414',
                 }}
             >
-                {saveStatus === 'saving'
-                    ? 'Enviando dados...'
-                    : saveStatus === 'success'
-                        ? 'Enviado'
-                        : 'Falha ao guardar'}
+                {column?.error ? column?.content : saveStatus === 'saving' ? 'Enviando dados...' : saveStatus === 'success' ? 'Enviado' : showMessage ? 'Campo obrigatório*' : 'Campo inválido'}
             </div>
         )
         : null;
@@ -174,7 +181,7 @@ export const InlineEventCellField = React.memo(({
                     value={localValue ?? null}
                     onChange={commit}
                     clearable
-                    disabled={disabled}
+                    disabled={disabled || column?.disabled}
                 />
                 {statusNode}
             </div>
@@ -192,7 +199,7 @@ export const InlineEventCellField = React.memo(({
                     options={optionSetOptions}
                     value={multiValue}
                     onSelect={commit}
-                    disabled={disabled}
+                    disabled={disabled || column?.disabled}
                 />
                 {statusNode}
             </div>
@@ -208,7 +215,7 @@ export const InlineEventCellField = React.memo(({
                     onBlur={commit}
                     orientation={orientations.HORIZONTAL}
                     width={180}
-                    disabled={disabled}
+                    disabled={disabled || column?.disabled}
                 />
                 {statusNode}
             </div>
@@ -221,7 +228,7 @@ export const InlineEventCellField = React.memo(({
                 <BooleanField
                     value={localValue}
                     onBlur={commit}
-                    disabled={disabled}
+                    disabled={disabled || column?.disabled}
                 />
                 {statusNode}
             </div>
@@ -234,7 +241,7 @@ export const InlineEventCellField = React.memo(({
                 <TrueOnlyField
                     value={localValue}
                     onBlur={commit}
-                    disabled={disabled}
+                    disabled={disabled || column?.disabled}
                 />
                 {statusNode}
             </div>
@@ -248,7 +255,7 @@ export const InlineEventCellField = React.memo(({
                     value={localValue ?? ''}
                     onChange={handleNumericChange}
                     onBlur={handleNumericBlur}
-                    disabled={disabled}
+                    disabled={disabled || column?.disabled}
                     inputMode={column.type === dataElementTypes.NUMBER ? 'decimal' : 'numeric'}
                 />
                 {statusNode}
@@ -262,7 +269,7 @@ export const InlineEventCellField = React.memo(({
                 value={localValue ?? ''}
                 onChange={setLocalValue}
                 onBlur={commit}
-                disabled={disabled}
+                disabled={disabled || column?.disabled}
             />
             {statusNode}
         </div>

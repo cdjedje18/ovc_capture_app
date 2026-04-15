@@ -5,16 +5,16 @@ export const useStaticTemplates = (defaultAlteredTemplate: WorkingListTemplate |
     useMemo(
         () => [
             defaultAlteredTemplate || {
-                    id: defaultTemplateId,
-                    isDefault: true,
-                    name: 'default',
-                    access: {
-                        update: false,
-                        delete: false,
-                        write: false,
-                        manage: false,
-                    },
+                id: defaultTemplateId,
+                isDefault: true,
+                name: 'default',
+                access: {
+                    update: false,
+                    delete: false,
+                    write: false,
+                    manage: false,
                 },
+            },
             // {
             //     id: 'active',
             //     name: i18n.t('Active enrollments'),
