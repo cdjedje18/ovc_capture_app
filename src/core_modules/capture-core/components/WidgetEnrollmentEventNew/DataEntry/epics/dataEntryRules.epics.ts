@@ -27,17 +27,19 @@ import type { QuerySingleResource } from '../../../../utils/api';
 export const CustomRunRulesForNewEvent = async ({
     rulesExecutionDependenciesClientFormatted,
     querySingleResource,
-    orgUnit
+    orgUnit,
+    currentEvent
 }: {
-    orgUnit:any
+    currentEvent: any
+    orgUnit: any
     rulesExecutionDependenciesClientFormatted: RulesExecutionDependenciesClientFormatted;
     querySingleResource: QuerySingleResource;
 }) => {
     const { events, attributeValues, enrollmentData } = rulesExecutionDependenciesClientFormatted;
-    const { programId, stageId }: { programId: string; stageId: string } = getLocationQuery();
+    const { entryProgram, stageId }: { entryProgram: string; stageId: string } = getLocationQuery();
 
-    const program = getTrackerProgramThrowIfNotFound(programId);
-    const stage = program.getStage(stageId);
+    const program = getTrackerProgramThrowIfNotFound(entryProgram);
+    const stage = program.getStage(localStorage.getItem('dataEntryStage')!);
     if (!stage) {
         throw Error(i18n.t('Program stage not found'));
     }
@@ -45,13 +47,13 @@ export const CustomRunRulesForNewEvent = async ({
     const foundation = stage.stageForm;
     const programStageId = foundation.id;
 
-    const currentEvent = /*{ ...currentEventValues, ...orgunir, programStageId };*/{}
-   
+    const currEvent = { ...currentEvent, ...orgUnit, programStageId }
+
     const effects = getApplicableRuleEffectsForTrackerProgram({
         program,
         stage,
         orgUnit,
-        currentEvent,
+        currentEvent: currEvent,
         otherEvents: events,
         attributeValues,
         enrollmentData,
@@ -63,6 +65,7 @@ export const CustomRunRulesForNewEvent = async ({
         querySingleResource,
     });
 
+    return effectsWithValidations
 };
 
 

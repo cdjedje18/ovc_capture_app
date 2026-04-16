@@ -1,13 +1,12 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import moment from 'moment';
 import { useConfig, useDataMutation, useDataQuery } from '@dhis2/app-runtime';
 import { Button } from '@dhis2/ui';
 import log from 'loglevel';
-import { v4 as uuid } from 'uuid';
 import { errorCreator, FEATURES, featureAvailable } from 'capture-core-utils';
 import type { Mutation } from 'capture-core-utils/types/app-runtime';
 import { dataElementTypes, DataElement, OptionSet, Option } from '../../../../metaData';
-import { convertClientToList, convertClientToServer, convertServerToClient } from '../../../../converters';
+import { convertClientToList } from '../../../../converters';
 import { generateUID } from '../../../../utils/uid/generateUID';
 import { buildUrlQueryString } from '../../../../utils/routing';
 import { isMembersFormPage as isMembersFormPageRoute } from '../../utils/isMembersFormPage';
@@ -17,12 +16,13 @@ import {
 } from '../../WorkingListsBase/membersVisitDate.store';
 import { InlineEventCellField } from './InlineEventCellField.component';
 import { MEMBERS_CAPTURE_LINK_COLUMN_ID } from '../../TrackerWorkingLists/Setup/hooks/useDefaultColumnConfig';
-import { getFilterApiName } from '../../TrackerWorkingLists/helpers';
-import { CustomDhis2RulesEngine } from 'capture-core/components/Pages/MembersFormPage/hooks/programRules/rules-engine/RulesEngine';
 import useShowAlerts from 'capture-core/components/Pages/MembersFormPage/hooks/common/useShowAlert';
-import { startRunRulesPostUpdateField } from 'capture-core/components/DataEntry';
-import { executeRulesOnUpdateForNewEvent } from 'capture-core/components/WidgetEnrollmentEventNew/DataEntry/actions/dataEntry.actions';
-import { runRulesForNewEvent } from 'capture-core/components/WidgetEnrollmentEventNew/DataEntry/epics/dataEntryRules.epics';
+import { CustomRunRulesForNewEvent } from 'capture-core/components/WidgetEnrollmentEventNew/DataEntry/epics/dataEntryRules.epics';
+import { CustomQuerySingleResource } from './useSingleResource';
+import { applyEffectsToHeaders } from 'capture-core/components/Pages/MembersFormPage/utils/applyRules';
+import { displayTextRule } from 'capture-core/components/Pages/MembersFormPage/schema/infoSchema';
+import { useRecoilValue, useSetRecoilState } from 'recoil';
+import { orgUnitSchema } from 'capture-core/components/Pages/MembersFormPage/schema/optionGroupsSchema';
 
 const TRACKER_EVENT_MUTATION: Mutation = {
     resource: 'tracker?async=false&importStrategy=CREATE_AND_UPDATE',
@@ -173,43 +173,6 @@ const applyRecordOverridePatch = (
     },
 });
 
-const revertRecordOverridePatch = ({
-    currentOverrides,
-    scopeKey,
-    rowId,
-    columnId,
-    existingClientValue,
-    eventId,
-}: {
-    currentOverrides: { [key: string]: { [key: string]: any } },
-    scopeKey: string,
-    rowId: string,
-    columnId: string,
-    existingClientValue: any,
-    eventId?: string,
-}) => {
-    const scopedOverrides = currentOverrides[scopeKey] || {};
-    const currentRowOverrides = scopedOverrides[rowId] || {};
-    const nextRowOverrides = {
-        ...currentRowOverrides,
-        [columnId]: existingClientValue,
-    };
-
-    if (!eventId) {
-        delete nextRowOverrides[EVENT_METADATA_KEYS.eventId];
-        delete nextRowOverrides[EVENT_METADATA_KEYS.occurredAt];
-        delete nextRowOverrides[EVENT_METADATA_KEYS.syntheticForSelectedDate];
-    }
-
-    return {
-        ...currentOverrides,
-        [scopeKey]: {
-            ...scopedOverrides,
-            [rowId]: nextRowOverrides,
-        },
-    };
-};
-
 const getOverrideScopeKey = ({
     isMembersFormPage,
     selectedMembersVisitDate,
@@ -277,7 +240,6 @@ export const useDataSource = (
         [key: string]: any,
     }>,
     currentProgramStageId?: string,
-    program?: any,
 ) => {
     const isMembersFormPage = isMembersFormPageRoute();
     const selectedMembersVisitDate = useSelectedMembersVisitDate();
@@ -290,7 +252,7 @@ export const useDataSource = (
     } = useDataQuery(SELECTED_DATE_EVENTS_QUERY, { lazy: true });
     const [saveEventMutation] = useDataMutation(TRACKER_EVENT_MUTATION);
     const [recordOverrides, setRecordOverrides] = useState<{ [key: string]: { [key: string]: any } }>({});
-    const [rowChanged, setRowChanged] = useState<string>('');
+    const setDisplayTextRule = useSetRecoilState(displayTextRule);
     const activeOverrideScopeKey = getOverrideScopeKey({
         isMembersFormPage,
         selectedMembersVisitDate: selectedMembersVisitDate?.normalized,
@@ -308,10 +270,11 @@ export const useDataSource = (
         return fetchedSelectedDateEventsByTei;
     }, [fetchedSelectedDateEventsByTei, isMembersFormPage, selectedMembersVisitDate?.normalized]);
 
-    const { runRulesEngine } = isMembersFormPage ? CustomDhis2RulesEngine({ program: program._id, type: 'programStage', rowChanged }) : {};
     const rowValueRef = useRef({});
     const { hide, show } = useShowAlerts()
+    const { querySingleResource } = CustomQuerySingleResource()
 
+    console.log(rowValueRef.current)
     const eventRecordsArray = useMemo(() =>
         recordsOrder && records && recordsOrder
             .map((id) => {
@@ -327,7 +290,7 @@ export const useDataSource = (
                         return {
                             [EVENT_METADATA_KEYS.eventId]: selectedDateEvent?.event,
                             [EVENT_METADATA_KEYS.occurredAt]: selectedDateEvent?.occurredAt,
-                            'event_date': selectedMembersVisitDate?.normalized,
+                            'occurredAt': selectedMembersVisitDate?.normalized,
                             [EVENT_METADATA_KEYS.syntheticForSelectedDate]: false,
                             ...selectedDateEventValues,
                         };
@@ -335,7 +298,6 @@ export const useDataSource = (
                     ...((recordOverrides[activeOverrideScopeKey] || {})[id] || {}),
                     id,
                 };
-                setRowChanged('');
                 return data;
             }), [
         records,
@@ -527,7 +489,6 @@ export const useDataSource = (
             selectedMembersVisitDate: selectedMembersVisitDate?.normalized,
         });
         const rowId = eventRecord.id;
-        setRowChanged(rowId);
 
         const overridePatch = object ? {
             ...value
@@ -538,140 +499,209 @@ export const useDataSource = (
         setRecordOverrides(currentOverrides => applyRecordOverridePatch(currentOverrides, overrideScopeKey, rowId, overridePatch));
     };
 
-    return useMemo(() => {
-        if (eventRecordsArray) return eventRecordsArray
-            .map((eventRecord, rowIndex) => {
-                const headers = isMembersFormPage ? runRulesEngine!({ overrideValues: eventRecord, overrideVariables: columns, idx: rowIndex }) : columns;
-                const uid = uuid();
-                runRulesForNewEvent({})
-                startRunRulesPostUpdateField('enrollmentEvent', 'newEvent', uid),
+    const [listData, setListData] = useState<any[]>([]);
+    const orgUnitData = useRecoilValue(orgUnitSchema)
 
-                    executeRulesOnUpdateForNewEvent({ ...innerAction.payload, uid, rulesExecutionDependenciesClientFormatted }),
-                // console.log(headers)
-                const listRecord = columns
-                    .filter(column => column.visible)
-                    .reduce((acc, column) => {
-                        const { id, type, options, resolveValue } = column;
+    useEffect(() => {
+        if (!eventRecordsArray) return;
 
-                        const clientValue = eventRecord[id];
+        let cancelled = false;
 
-                        if (isMembersFormPage && id === MEMBERS_CAPTURE_LINK_COLUMN_ID) {
-                            const captureEnrollmentUrl = getCaptureEnrollmentUrl({
-                                baseUrl,
-                                enrollmentId: eventRecord[EVENT_METADATA_KEYS.enrollmentId],
-                                orgUnitId: eventRecord[EVENT_METADATA_KEYS.orgUnitId],
-                                programId: eventRecord[EVENT_METADATA_KEYS.programId],
-                                teiId: eventRecord[EVENT_METADATA_KEYS.teiId],
+        const buildRows = async () => {
+            const results = await Promise.all(
+                eventRecordsArray.map(async (eventRecord, rowIndex) => {
+                    let copyData = { ...eventRecord };
+                    const headers = columns;
+                    const teiRecord = records?.[eventRecord[EVENT_METADATA_KEYS.teiId]];
+                    const sanitizedTeiRecord = teiRecord
+                        ? Object.fromEntries(
+                            Object.entries(teiRecord).filter(([key]) => !key.startsWith('__'))
+                        )
+                        : undefined;
+
+                    if (sanitizedTeiRecord) {
+                        Object.keys(sanitizedTeiRecord).forEach(key => {
+                            delete copyData[key];
+                        });
+                        copyData = Object.fromEntries(
+                            Object.entries(copyData).filter(([key]) => !key.startsWith('__'))
+                        );
+                    }
+
+                    let updated = columns;
+
+                    if (isMembersFormPage) {
+                        const effects: any = await CustomRunRulesForNewEvent({
+                            currentEvent: copyData,
+                            orgUnit: orgUnitData,
+                            querySingleResource,
+                            rulesExecutionDependenciesClientFormatted: {
+                                attributeValues: sanitizedTeiRecord as any,
+                                enrollmentData: {
+                                    enrollmentId: records?.[eventRecord[EVENT_METADATA_KEYS.teiId]]?.[EVENT_METADATA_KEYS.enrollmentId],
+                                    enrolledAt: "",
+                                    occurredAt: ""
+                                },
+                                events: []
+                            }
+                        });
+
+                        updated = applyEffectsToHeaders(headers, effects);
+                        const generalError = effects?.SHOWERROR?.general?.[0];
+
+                        if (generalError)
+                            setDisplayTextRule(prev => {
+                                if (generalError && !prev.find(x => x.key === rowIndex)) {
+                                    return [
+                                        ...prev,
+                                        {
+                                            key: rowIndex,
+                                            name: sanitizedTeiRecord?.[localStorage.getItem('nomeDoMembro') || ''],
+                                            content: generalError?.error?.message,
+                                        },
+                                    ];
+                                }
+
+                                if (!generalError) {
+                                    return prev?.filter(x => x.key !== rowIndex) || [];
+                                }
+
+                                return prev;
                             });
+                    }
 
-                            acc[id] = captureEnrollmentUrl
-                                ? React.createElement(
-                                    'a',
-                                    {
-                                        href: captureEnrollmentUrl,
-                                        target: '_blank',
-                                        rel: 'noopener noreferrer',
-                                    },
-                                    React.createElement(Button, { small: true }, 'Detalhes'),
-                                )
-                                : null;
-                            return acc;
-                        }
 
-                        if (isMembersFormPage && id === 'actions') {
-                            acc[id] = React.createElement(
-                                'div',
-                                { style: { display: 'flex', gap: '8px' } },
-                                React.createElement(
-                                    Button,
-                                    {
-                                        small: true,
-                                        loading: eventRecord?.loading,
-                                        disabled: !Boolean(rowValueRef.current?.[rowIndex]),
-                                        onClick: () => {
-                                            const required: any = headers?.filter(x => x.required)
-                                            const error: any = headers?.filter(x => x.error)
+                    const listRecord = columns
+                        .filter(column => column.visible)
+                        .reduce((acc, column) => {
+                            const { id, type, options, resolveValue } = column;
+                            const clientValue = eventRecord[id];
 
-                                            const conjunto = [...error, ...required]
+                            if (isMembersFormPage && id === MEMBERS_CAPTURE_LINK_COLUMN_ID) {
+                                const captureEnrollmentUrl = getCaptureEnrollmentUrl({
+                                    baseUrl,
+                                    enrollmentId: eventRecord[EVENT_METADATA_KEYS.enrollmentId],
+                                    orgUnitId: eventRecord[EVENT_METADATA_KEYS.orgUnitId],
+                                    programId: eventRecord[EVENT_METADATA_KEYS.programId],
+                                    teiId: eventRecord[EVENT_METADATA_KEYS.teiId],
+                                });
 
-                                            if (required?.length > 0 || error?.length > 0)
-                                                for (let req of conjunto) {
-                                                    if (!eventRecord[req.id]) {
-                                                        show({
-                                                            message: `O campo "${req?.header}" é obrigatório!`,
-                                                            type: { warning: true }
-                                                        });
-                                                        setTimeout(hide, 5000);
+                                acc[id] = captureEnrollmentUrl
+                                    ? React.createElement(
+                                        'a',
+                                        { href: captureEnrollmentUrl, target: '_blank', rel: 'noopener noreferrer' },
+                                        React.createElement(Button, { small: true }, 'Detalhes'),
+                                    )
+                                    : null;
+                                return acc;
+                            }
 
-                                                        return;
+                            if (isMembersFormPage && id === 'actions') {
+                                acc[id] = React.createElement(
+                                    'div',
+                                    { style: { display: 'flex', gap: '8px' } },
+                                    React.createElement(
+                                        Button,
+                                        {
+                                            small: true,
+                                            loading: eventRecord?.loading,
+                                            disabled: !Boolean(rowValueRef.current?.[rowIndex]),
+                                            onClick: () => {
+                                                const required: any = updated?.filter(x => x.required);
+                                                const error: any = updated?.filter(x => x.error);
+                                                const conjunto = [...error, ...required];
+
+                                                if (required?.length > 0 || error?.length > 0) {
+                                                    for (let req of conjunto) {
+                                                        if (!eventRecord[req.id]) {
+                                                            show({
+                                                                message: `O campo "${req?.header}" é obrigatório!`,
+                                                                type: { warning: true }
+                                                            });
+                                                            setTimeout(hide, 5000);
+                                                            return;
+                                                        }
                                                     }
                                                 }
 
-                                            recordOverride({ eventRecord, column, value: { loading: true }, object: true })
-                                            void persistEventCellValue({ eventRecord, column, row: rowIndex })
-                                        }
-                                    },
-                                    '💾 Gravar'
-                                )
-                            )
-
-                            return acc;
-                        }
-
-                        if (isMembersFormPage && column.additionalColumn) {
-                            const thisHeader = headers?.find(x => x.id == column.id);
-                            acc[id] = React.createElement(InlineEventCellField, {
-                                key: `${eventRecord.id}-${id}`,
-                                column: thisHeader,
-                                value: clientValue,
-                                ...((isMembersFormLocked || eventRecord.loading) ? { disabled: (isMembersFormLocked || eventRecord.loading) } : {}),
-                                saveStatus: 'idle',
-                                onCommit: (nextClientValue: any) => {
-                                    recordOverride({ eventRecord, column, value: nextClientValue })
-
-                                    const nextRowValue = {
-                                        ...rowValueRef.current,
-                                        [rowIndex]: {
-                                            ...(rowValueRef.current[rowIndex] || {}),
-                                            [column.id]: nextClientValue,
+                                                recordOverride({ eventRecord, column, value: { loading: true }, object: true });
+                                                void persistEventCellValue({ eventRecord, column, row: rowIndex });
+                                            }
                                         },
-                                    }
-                                    rowValueRef.current = nextRowValue;
-                                },
-                            });
-                            return acc;
-                        }
-
-                        if (resolveValue) {
-                            acc[id] = resolveValue()[clientValue];
-                        } else if (options) {
-                            if (type === dataElementTypes.MULTI_TEXT) {
-                                const dataElement = createDataElement(column);
-                                acc[id] = convertClientToList(clientValue, type, dataElement);
-                            } else {
-                                // TODO: Need is equal comparer for types because `sourceValue` and `option` can be an object
-                                // for example (for some data element types) and we can't do strict comparison.
-                                const option = options.find(o => o.value === clientValue);
-                                if (!option) {
-                                    log.error(
-                                        errorCreator('Missing value in options')({ id, clientValue, options }),
-                                    );
-                                    acc[id] = convertClientToList(clientValue, type);
-                                } else {
-                                    acc[id] = option.text;
-                                }
+                                        '💾 Gravar'
+                                    )
+                                );
+                                return acc;
                             }
-                        } else {
-                            acc[id] = convertClientToList(clientValue, type);
-                        }
-                        return acc;
-                    }, {});
 
-                return {
-                    ...listRecord,
-                    id: eventRecord.id, // used as rowkey
-                };
-            })
+                            if (isMembersFormPage && column.additionalColumn) {
+                                const thisHeader = updated?.find(x => x.id == column.id);
+
+                                acc[id] = React.createElement(InlineEventCellField, {
+                                    key: `${eventRecord.id}-${id}`,
+                                    column: thisHeader as any,
+                                    value: thisHeader && 'value' in thisHeader ? thisHeader.value : clientValue,
+                                    ...((isMembersFormLocked || eventRecord.loading)
+                                        ? { disabled: (isMembersFormLocked || eventRecord.loading) }
+                                        : {}),
+                                    saveStatus: 'idle',
+                                    onCommit: (nextClientValue: any) => {
+
+                                        recordOverride({ eventRecord, column, value: nextClientValue });
+                                        const nextRowValue = {
+                                            ...rowValueRef.current,
+                                            [rowIndex]: {
+                                                ...(rowValueRef.current[rowIndex] || {}),
+                                                [column.id]: nextClientValue,
+                                            },
+                                        };
+                                        rowValueRef.current = nextRowValue;
+                                    },
+                                });
+                                return acc;
+                            }
+
+                            if (resolveValue) {
+                                acc[id] = resolveValue()[clientValue];
+                            } else if (options) {
+                                if (type === dataElementTypes.MULTI_TEXT) {
+                                    const dataElement = createDataElement(column);
+                                    acc[id] = convertClientToList(clientValue, type, dataElement);
+                                } else {
+                                    const option = options.find(o => o.value === clientValue);
+                                    if (!option) {
+                                        log.error(
+                                            errorCreator('Missing value in options')({ id, clientValue, options }),
+                                        );
+                                        acc[id] = convertClientToList(clientValue, type);
+                                    } else {
+                                        acc[id] = option.text;
+                                    }
+                                }
+                            } else {
+                                acc[id] = convertClientToList(clientValue, type);
+                            }
+
+                            return acc;
+                        }, {});
+
+                    return {
+                        ...listRecord,
+                        id: eventRecord.id,
+                    };
+                })
+            );
+
+            if (!cancelled) {
+                setListData(results);
+            }
+        };
+
+        buildRows();
+
+        return () => {
+            cancelled = true;
+        };
     }, [
         eventRecordsArray,
         columns,
@@ -680,4 +710,6 @@ export const useDataSource = (
         isMembersFormLocked,
         persistEventCellValue,
     ]);
+
+    return { listData };
 };
