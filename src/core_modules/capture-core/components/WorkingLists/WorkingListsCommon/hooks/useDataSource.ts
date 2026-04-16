@@ -3,6 +3,7 @@ import moment from 'moment';
 import { useConfig, useDataMutation, useDataQuery } from '@dhis2/app-runtime';
 import { Button } from '@dhis2/ui';
 import log from 'loglevel';
+import { v4 as uuid } from 'uuid';
 import { errorCreator, FEATURES, featureAvailable } from 'capture-core-utils';
 import type { Mutation } from 'capture-core-utils/types/app-runtime';
 import { dataElementTypes, DataElement, OptionSet, Option } from '../../../../metaData';
@@ -19,6 +20,9 @@ import { MEMBERS_CAPTURE_LINK_COLUMN_ID } from '../../TrackerWorkingLists/Setup/
 import { getFilterApiName } from '../../TrackerWorkingLists/helpers';
 import { CustomDhis2RulesEngine } from 'capture-core/components/Pages/MembersFormPage/hooks/programRules/rules-engine/RulesEngine';
 import useShowAlerts from 'capture-core/components/Pages/MembersFormPage/hooks/common/useShowAlert';
+import { startRunRulesPostUpdateField } from 'capture-core/components/DataEntry';
+import { executeRulesOnUpdateForNewEvent } from 'capture-core/components/WidgetEnrollmentEventNew/DataEntry/actions/dataEntry.actions';
+import { runRulesForNewEvent } from 'capture-core/components/WidgetEnrollmentEventNew/DataEntry/epics/dataEntryRules.epics';
 
 const TRACKER_EVENT_MUTATION: Mutation = {
     resource: 'tracker?async=false&importStrategy=CREATE_AND_UPDATE',
@@ -538,25 +542,18 @@ export const useDataSource = (
         if (eventRecordsArray) return eventRecordsArray
             .map((eventRecord, rowIndex) => {
                 const headers = isMembersFormPage ? runRulesEngine!({ overrideValues: eventRecord, overrideVariables: columns, idx: rowIndex }) : columns;
+                const uid = uuid();
+                runRulesForNewEvent({})
+                startRunRulesPostUpdateField('enrollmentEvent', 'newEvent', uid),
 
+                    executeRulesOnUpdateForNewEvent({ ...innerAction.payload, uid, rulesExecutionDependenciesClientFormatted }),
                 // console.log(headers)
                 const listRecord = columns
                     .filter(column => column.visible)
                     .reduce((acc, column) => {
                         const { id, type, options, resolveValue } = column;
-                        // const isSelectedDateMatch = hasEventForSelectedDate({
-                        //     isMembersFormPage,
-                        //     selectedMembersVisitDate: selectedMembersVisitDate?.normalized,
-                        //     occurredAt: eventRecord[EVENT_METADATA_KEYS.occurredAt],
-                        // });
-                        // const isSyntheticEventForSelectedDate = Boolean(eventRecord[EVENT_METADATA_KEYS.syntheticForSelectedDate]);
-                        // const shouldBlankEventValue = isMembersFormPage
-                        //     && (
-                        //         !isSelectedDateMatch
-                        //         || (isSyntheticEventForSelectedDate && activeRowOverride[id] === undefined)
-                        //     )
-                        //     && (column.additionalColumn || column.mainProperty);
-                        const clientValue = /*shouldBlankEventValue ? undefined :*/ eventRecord[id];
+
+                        const clientValue = eventRecord[id];
 
                         if (isMembersFormPage && id === MEMBERS_CAPTURE_LINK_COLUMN_ID) {
                             const captureEnrollmentUrl = getCaptureEnrollmentUrl({

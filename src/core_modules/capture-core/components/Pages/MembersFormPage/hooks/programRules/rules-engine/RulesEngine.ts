@@ -166,13 +166,20 @@ export const CustomDhis2RulesEngine = (props: RulesEngineProps) => {
     // ─── Rules Engine ────────────────────────────────────────────────────────────
 
     function applyRulesToVariable(variable: any, values: Record<string, any>, idx?: number) {
-        const relevantRules = newProgramRules?.filter(
-            (x: any) =>
-                x.variable === variable.id ||
-                x.variable === variable.section ||
-                x.programRuleActionType === 'DISPLAYTEXT'
-        );
+        const relevantRules = (newProgramRules || [])
+            .filter(
+                (x: any) =>
+                    x.variable === variable.id ||
+                    x.variable === variable.section ||
+                    x.programRuleActionType === 'DISPLAYTEXT'
+            )
+            .sort((a: any, b: any) => {
+                const pa = a.priority ?? Infinity;
+                const pb = b.priority ?? Infinity;
+                return pa - pb;
+            });
 
+            // console.log(variable, values, programRulesVariables,'brooooooooooo')
         for (const rule of relevantRules) {
             const conditionMet = evaluateExpression(rule?.condition, variable, values, programRulesVariables);
 
@@ -222,7 +229,7 @@ export const CustomDhis2RulesEngine = (props: RulesEngineProps) => {
 
                         variable.disabled = shouldDisable;
                         if (variable.id == 'sh8tmEJ0ltI') {
-                            console.log(rule,'éi');
+                            console.log(rule, 'éi');
                         }
                     } else {
                         variable.value = null;

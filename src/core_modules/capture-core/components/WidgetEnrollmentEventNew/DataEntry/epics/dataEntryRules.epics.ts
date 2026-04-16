@@ -24,6 +24,48 @@ import { getLocationQuery } from '../../../../utils/routing';
 import { getCoreOrgUnitFn, orgUnitFetched } from '../../../../metadataRetrieval/coreOrgUnit';
 import type { QuerySingleResource } from '../../../../utils/api';
 
+export const CustomRunRulesForNewEvent = async ({
+    rulesExecutionDependenciesClientFormatted,
+    querySingleResource,
+    orgUnit
+}: {
+    orgUnit:any
+    rulesExecutionDependenciesClientFormatted: RulesExecutionDependenciesClientFormatted;
+    querySingleResource: QuerySingleResource;
+}) => {
+    const { events, attributeValues, enrollmentData } = rulesExecutionDependenciesClientFormatted;
+    const { programId, stageId }: { programId: string; stageId: string } = getLocationQuery();
+
+    const program = getTrackerProgramThrowIfNotFound(programId);
+    const stage = program.getStage(stageId);
+    if (!stage) {
+        throw Error(i18n.t('Program stage not found'));
+    }
+
+    const foundation = stage.stageForm;
+    const programStageId = foundation.id;
+
+    const currentEvent = /*{ ...currentEventValues, ...orgunir, programStageId };*/{}
+   
+    const effects = getApplicableRuleEffectsForTrackerProgram({
+        program,
+        stage,
+        orgUnit,
+        currentEvent,
+        otherEvents: events,
+        attributeValues,
+        enrollmentData,
+    });
+
+    const effectsWithValidations = await validateAssignEffects({
+        dataElements: foundation.getElements(),
+        effects,
+        querySingleResource,
+    });
+
+};
+
+
 const runRulesForNewEvent = async ({
     store,
     dataEntryId,
@@ -81,7 +123,7 @@ const runRulesForNewEvent = async ({
         rulesExecutedPostUpdateField(dataEntryId, itemId, uid),
         ...(coreOrgUnit && !cached ? [orgUnitFetched(coreOrgUnit)] : []),
     ],
-    newEventWidgetDataEntryBatchActionTypes.RULES_EFFECTS_ACTIONS_BATCH,
+        newEventWidgetDataEntryBatchActionTypes.RULES_EFFECTS_ACTIONS_BATCH,
     );
 };
 
