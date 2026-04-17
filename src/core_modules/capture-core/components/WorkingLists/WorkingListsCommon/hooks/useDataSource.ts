@@ -274,7 +274,6 @@ export const useDataSource = (
     const { hide, show } = useShowAlerts()
     const { querySingleResource } = CustomQuerySingleResource()
 
-    console.log(rowValueRef.current)
     const eventRecordsArray = useMemo(() =>
         recordsOrder && records && recordsOrder
             .map((id) => {
@@ -418,7 +417,7 @@ export const useDataSource = (
                     value,
                 }));
 
-            const mutationResponse = await saveEventMutation({
+            const mutationResponse: any = await saveEventMutation({
                 events: [{
                     event: targetEventId,
                     trackedEntity: teiId,
@@ -450,12 +449,20 @@ export const useDataSource = (
                 object: true
             })
 
-            show({
-                message: `Dados gravados com sucesso`,
-                type: { success: true }
-            });
+            if (mutationResponse?.stats?.created > 0 || mutationResponse?.stats?.updated > 0) {
+                show({
+                    message: `Dados gravados com sucesso`,
+                    type: { success: true }
+                });
+            } else if (mutationResponse?.stats?.ignored > 0) {
+                show({
+                    message: `Ocorreu um erro ao gravar evento`,
+                    type: { crirtical: true }
+                });
+                throwIfTrackerMutationFailed(mutationResponse);
+            }
             setTimeout(hide, 5000);
-            throwIfTrackerMutationFailed(mutationResponse);
+
         } catch (error) {
             show({
                 message: `Ocorreu um erro ao gravar os dados`,

@@ -8,9 +8,10 @@ export const useNavigate = () => {
     const handleBack = () => {
         const params = new URLSearchParams(window.location.hash.split('?')[1]);
         const programId = params.get('programId');
+         const orgUnitId = params.get('orgUnitId');
         const selectedTemplateId = `${programId}-default`;
 
-        navigate(`/?programId=${programId}&selectedTemplateId=${selectedTemplateId}&all`);
+        navigate(`/?programId=${programId}&orgUnitId=${orgUnitId}&selectedTemplateId=${selectedTemplateId}&all`);
     };
 
     const navigate = useCallback((path: string, scrollToTop = true) => {

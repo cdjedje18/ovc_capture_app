@@ -24,6 +24,32 @@ import { getLocationQuery } from '../../../../utils/routing';
 import { getCoreOrgUnitFn, orgUnitFetched } from '../../../../metadataRetrieval/coreOrgUnit';
 import type { QuerySingleResource } from '../../../../utils/api';
 
+function normalizeBooleanStrings(obj: any) {
+    if (Array.isArray(obj)) {
+        return obj.map(normalizeBooleanStrings);
+    }
+
+    if (obj !== null && typeof obj === 'object') {
+        const newObj = {};
+
+        for (const key in obj) {
+            const value = obj[key];
+
+            if (value === "true") {
+                newObj[key] = true;
+            } else if (value === "false") {
+                newObj[key] = false;
+            } else {
+                newObj[key] = normalizeBooleanStrings(value);
+            }
+        }
+
+        return newObj;
+    }
+
+    return obj;
+}
+
 export const CustomRunRulesForNewEvent = async ({
     rulesExecutionDependenciesClientFormatted,
     querySingleResource,
@@ -46,14 +72,14 @@ export const CustomRunRulesForNewEvent = async ({
 
     const foundation = stage.stageForm;
     const programStageId = foundation.id;
-
-    const currEvent = { ...currentEvent, ...orgUnit, programStageId }
+    const { code, groups, ...rest } = orgUnit
+    const currEvent = { ...currentEvent, orgUnit: { ...rest }, programStageId }
 
     const effects = getApplicableRuleEffectsForTrackerProgram({
         program,
         stage,
         orgUnit,
-        currentEvent: currEvent,
+        currentEvent: normalizeBooleanStrings(currEvent),
         otherEvents: events,
         attributeValues,
         enrollmentData,
