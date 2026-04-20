@@ -23,6 +23,7 @@ import { applyEffectsToHeaders } from 'capture-core/components/Pages/MembersForm
 import { displayTextRule } from 'capture-core/components/Pages/MembersFormPage/schema/infoSchema';
 import { useRecoilValue, useSetRecoilState } from 'recoil';
 import { orgUnitSchema } from 'capture-core/components/Pages/MembersFormPage/schema/optionGroupsSchema';
+import { makeNumbers } from './useViewHasTemplateChanges/utils/makeValueANumber';
 
 const TRACKER_EVENT_MUTATION: Mutation = {
     resource: 'tracker?async=false&importStrategy=CREATE_AND_UPDATE',
@@ -41,6 +42,8 @@ const EVENT_METADATA_KEYS = {
     syntheticForSelectedDate: '__syntheticForSelectedDate',
 } as const;
 
+const DEFAULT_OVERRIDE_SCOPE = '__default';
+
 const SELECTED_DATE_EVENTS_QUERY: any = {
     results: {
         resource: 'tracker/events',
@@ -49,7 +52,7 @@ const SELECTED_DATE_EVENTS_QUERY: any = {
             programStage: programStageId,
             pageSize: 10000,
             order: 'occurredAt:desc',
-            [featureAvailable(FEATURES.newEntityFilterQueryParam) ? 'trackedEntities' : 'trackedEntity']: trackedEntityIds,
+            [featureAvailable(FEATURES.newEntityFilterQueryParam) ? 'trackedEntities' : 'trackedEntityInstance']: trackedEntityIds,
             occurredAfter: selectedDate,
             occurredBefore: selectedDate,
             fields: 'event,trackedEntity,status,occurredAt,scheduledAt,orgUnit,assignedUser,dataValues[dataElement,value]',
@@ -58,8 +61,9 @@ const SELECTED_DATE_EVENTS_QUERY: any = {
 };
 
 const getOccurredAtDate = (occurredAt?: string) => occurredAt?.slice(0, 10);
-const DEFAULT_OVERRIDE_SCOPE = '__default';
-const getJoinedTeiIds = (teiIds: Array<string>) => teiIds.join(featureAvailable(FEATURES.newUIDsSeparator) ? ',' : ';');
+
+const getJoinedTeiIds = (teiIds: Array<string>) =>
+    teiIds.join(featureAvailable(FEATURES.newUIDsSeparator) ? ',' : ';');
 
 const throwIfTrackerMutationFailed = (response: any) => {
     const normalizedResponse = response?.response || response?.details || response;
@@ -67,12 +71,10 @@ const throwIfTrackerMutationFailed = (response: any) => {
     const hasValidationErrors = Array.isArray(errorReports) && errorReports.length > 0;
     const hasErrorStatus = normalizedResponse?.status === 'ERROR';
 
-    if (!hasValidationErrors && !hasErrorStatus) {
-        return;
-    }
+    if (!hasValidationErrors && !hasErrorStatus) return;
 
     const validationMessage = hasValidationErrors
-        ? errorReports.map((errorReport: { message?: string }) => errorReport.message).filter(Boolean).join(' ')
+        ? errorReports.map((r: { message?: string }) => r.message).filter(Boolean).join(' ')
         : undefined;
 
     const error = new Error(validationMessage || 'Tracker event mutation failed');
@@ -85,12 +87,13 @@ const hasEventForSelectedDate = ({
     selectedMembersVisitDate,
     occurredAt,
 }: {
-    isMembersFormPage: boolean,
-    selectedMembersVisitDate?: string,
-    occurredAt?: string,
-}) => !isMembersFormPage
-|| !selectedMembersVisitDate
-    || getOccurredAtDate(occurredAt) === selectedMembersVisitDate;
+    isMembersFormPage: boolean;
+    selectedMembersVisitDate?: string;
+    occurredAt?: string;
+}) =>
+    !isMembersFormPage ||
+    !selectedMembersVisitDate ||
+    getOccurredAtDate(occurredAt) === selectedMembersVisitDate;
 
 const getEventMetadata = (eventRecord: { [key: string]: any }) => ({
     eventId: eventRecord[EVENT_METADATA_KEYS.eventId],
@@ -110,41 +113,30 @@ const getCaptureEnrollmentUrl = ({
     programId,
     teiId,
 }: {
-    baseUrl?: string,
-    enrollmentId?: string,
-    orgUnitId?: string,
-    programId?: string,
-    teiId?: string,
+    baseUrl?: string;
+    enrollmentId?: string;
+    orgUnitId?: string;
+    programId?: string;
+    teiId?: string;
 }) => {
-    if (!baseUrl || !enrollmentId || !orgUnitId || !programId || !teiId) {
-        return undefined;
-    }
+    if (!baseUrl || !enrollmentId || !orgUnitId || !programId || !teiId) return undefined;
 
-    const queryString = buildUrlQueryString({
-        enrollmentId,
-        orgUnitId,
-        programId,
-        teiId,
-    });
-
+    const queryString = buildUrlQueryString({ enrollmentId, orgUnitId, programId, teiId });
     return `${baseUrl}/dhis-web-capture/index.html#/enrollment?${queryString}`;
 };
 
 const getOccurredAtWithCurrentTime = (selectedDate?: string) => {
     const now = moment();
-    if (!selectedDate) {
-        return now.format('YYYY-MM-DDTHH:mm:ss.SSS');
-    }
+    if (!selectedDate) return now.format('YYYY-MM-DDTHH:mm:ss.SSS');
 
-    const date = moment(selectedDate, ['DD-MM-YYYY', 'YYYY-MM-DD'], true);
-
-    return date
+    return moment(selectedDate, ['DD-MM-YYYY', 'YYYY-MM-DD'], true)
         .set({
             hour: now.hour(),
             minute: now.minute(),
             second: now.second(),
             millisecond: now.millisecond(),
-        }).format('YYYY-MM-DDTHH:mm:ss.SSS');
+        })
+        .format('YYYY-MM-DDTHH:mm:ss.SSS');
 };
 
 const getOccurredAtForSave = ({
@@ -152,9 +144,9 @@ const getOccurredAtForSave = ({
     existingOccurredAt,
     selectedMembersVisitDate,
 }: {
-    eventId?: string,
-    existingOccurredAt?: string,
-    selectedMembersVisitDate?: string,
+    eventId?: string;
+    existingOccurredAt?: string;
+    selectedMembersVisitDate?: string;
 }) => (eventId ? existingOccurredAt : getOccurredAtWithCurrentTime(selectedMembersVisitDate));
 
 const applyRecordOverridePatch = (
@@ -178,35 +170,29 @@ const getOverrideScopeKey = ({
     selectedMembersVisitDate,
     existingOccurredAt,
 }: {
-    isMembersFormPage: boolean,
-    selectedMembersVisitDate?: string,
-    existingOccurredAt?: string,
+    isMembersFormPage: boolean;
+    selectedMembersVisitDate?: string;
+    existingOccurredAt?: string;
 }) => {
-    if (!isMembersFormPage) {
-        return DEFAULT_OVERRIDE_SCOPE;
-    }
-
+    if (!isMembersFormPage) return DEFAULT_OVERRIDE_SCOPE;
     return selectedMembersVisitDate || getOccurredAtDate(existingOccurredAt) || DEFAULT_OVERRIDE_SCOPE;
 };
 
 const getLatestEventByTrackedEntity = (events: Array<any>) =>
     events.reduce((acc, event) => {
         const trackedEntityId = event.trackedEntity;
-        if (!trackedEntityId) {
-            return acc;
-        }
+        if (!trackedEntityId) return acc;
 
-        const currentSelected = acc[trackedEntityId];
-        if (!currentSelected) {
+        const current = acc[trackedEntityId];
+        if (!current) {
             acc[trackedEntityId] = event;
             return acc;
         }
 
-        const currentDate = event.occurredAt || event.scheduledAt || '';
-        const selectedDate = currentSelected.occurredAt || currentSelected.scheduledAt || '';
-        if (currentDate > selectedDate) {
-            acc[trackedEntityId] = event;
-        }
+        const eventDate = event.occurredAt || event.scheduledAt || '';
+        const currentDate = current.occurredAt || current.scheduledAt || '';
+        if (eventDate > currentDate) acc[trackedEntityId] = event;
+
         return acc;
     }, {});
 
@@ -217,27 +203,31 @@ const createDataElement = (column) => {
     });
 
     if (column.options) {
-        const options = column.options.map(option =>
-            new Option((o) => {
+        const options = column.options.map(
+            option => new Option((o) => {
                 o.text = option.text;
                 o.value = option.value;
             }),
         );
-        const optionSet = new OptionSet(column.id, options, null, dataElement);
-        dataElement.optionSet = optionSet;
+        dataElement.optionSet = new OptionSet(column.id, options, null, dataElement);
     }
+
     return dataElement;
 };
+
+// ---------------------------------------------------------------------------
+// Hook
+// ---------------------------------------------------------------------------
 
 export const useDataSource = (
     records: { [key: string]: any } | undefined,
     recordsOrder: Array<string> | undefined,
     columns: Array<{
-        id: string,
-        options?: Array<{ text: string, value: any }> | null,
-        type: typeof dataElementTypes[keyof typeof dataElementTypes],
-        visible: boolean,
-        [key: string]: any,
+        id: string;
+        options?: Array<{ text: string; value: any }> | null;
+        type: typeof dataElementTypes[keyof typeof dataElementTypes];
+        visible: boolean;
+        [key: string]: any;
     }>,
     currentProgramStageId?: string,
 ) => {
@@ -245,71 +235,89 @@ export const useDataSource = (
     const selectedMembersVisitDate = useSelectedMembersVisitDate();
     const isMembersFormLocked = isMembersFormPage && !selectedMembersVisitDate?.normalized;
     const { baseUrl } = useConfig();
+
     const {
         refetch: refetchSelectedDateEvents,
         data: selectedDateEventsData,
         loading: selectedDateEventsLoading,
     } = useDataQuery(SELECTED_DATE_EVENTS_QUERY, { lazy: true });
+
     const [saveEventMutation] = useDataMutation(TRACKER_EVENT_MUTATION);
     const [recordOverrides, setRecordOverrides] = useState<{ [key: string]: { [key: string]: any } }>({});
+    const [listData, setListData] = useState<any[]>([]);
+
     const setDisplayTextRule = useSetRecoilState(displayTextRule);
+    const orgUnitData = useRecoilValue(orgUnitSchema);
+    const rowValueRef = useRef({});
+
+    const { hide, show } = useShowAlerts();
+    const { querySingleResource } = CustomQuerySingleResource();
+
+    // Derived state ----------------------------------------------------------
+
     const activeOverrideScopeKey = getOverrideScopeKey({
         isMembersFormPage,
         selectedMembersVisitDate: selectedMembersVisitDate?.normalized,
     });
+
     const fetchedSelectedDateEventsByTei = useMemo(() => {
-        const selectedDateEventsResults = selectedDateEventsData?.results as any;
-        const events = selectedDateEventsResults?.events || selectedDateEventsResults?.instances || [];
+        rowValueRef.current = {};
+        const results = selectedDateEventsData?.results as any;
+        const events = results?.events || results?.instances || [];
         return getLatestEventByTrackedEntity(events);
     }, [selectedDateEventsData]);
-    const selectedDateEventsByTei = useMemo(() => {
-        if (!isMembersFormPage || !selectedMembersVisitDate?.normalized) {
-            return undefined;
-        }
 
+    const selectedDateEventsByTei = useMemo(() => {
+        if (!isMembersFormPage || !selectedMembersVisitDate?.normalized) return undefined;
         return fetchedSelectedDateEventsByTei;
     }, [fetchedSelectedDateEventsByTei, isMembersFormPage, selectedMembersVisitDate?.normalized]);
 
-    const rowValueRef = useRef({});
-    const { hide, show } = useShowAlerts()
-    const { querySingleResource } = CustomQuerySingleResource()
-
     const eventRecordsArray = useMemo(() =>
-        recordsOrder && records && recordsOrder
-            .map((id) => {
-                const data = {
-                    ...records[id],
-                    ...(isMembersFormPage && selectedMembersVisitDate?.normalized && selectedDateEventsByTei ? (() => {
-                        const selectedDateEvent = selectedDateEventsByTei[records[id]?.[EVENT_METADATA_KEYS.teiId] || id];
-                        const selectedDateEventValues = (selectedDateEvent?.dataValues || []).reduce((acc, dataValue) => {
-                            acc[dataValue.dataElement] = dataValue.value;
-                            return acc;
-                        }, {});
+        recordsOrder && records && recordsOrder.map((id, idx) => {
+            const cached = Object.values(rowValueRef.current).find((item: any) => item.idx === idx) ?? {};
 
-                        return {
-                            [EVENT_METADATA_KEYS.eventId]: selectedDateEvent?.event,
-                            [EVENT_METADATA_KEYS.occurredAt]: selectedDateEvent?.occurredAt,
-                            'occurredAt': selectedMembersVisitDate?.normalized,
-                            [EVENT_METADATA_KEYS.syntheticForSelectedDate]: false,
-                            ...selectedDateEventValues,
-                        };
-                    })() : {}),
-                    ...((recordOverrides[activeOverrideScopeKey] || {})[id] || {}),
-                    id,
-                };
-                return data;
-            }), [
-        records,
-        recordsOrder,
-        recordOverrides,
-        activeOverrideScopeKey,
-        isMembersFormPage,
-        selectedMembersVisitDate?.normalized,
-        selectedDateEventsByTei,
-        columns,
-    ]);
+            const selectedDatePatch = isMembersFormPage && selectedMembersVisitDate?.normalized && selectedDateEventsByTei
+                ? (() => {
+                    const selectedDateEvent = selectedDateEventsByTei[records[id]?.[EVENT_METADATA_KEYS.teiId] || id];
+                    const selectedDateEventValues = (selectedDateEvent?.dataValues || []).reduce((acc, dv) => {
+                        acc[dv.dataElement] = dv.value;
+                        return acc;
+                    }, {});
 
-    React.useEffect(() => {
+                    return {
+                        [EVENT_METADATA_KEYS.eventId]: selectedDateEvent?.event,
+                        [EVENT_METADATA_KEYS.occurredAt]: selectedDateEvent?.occurredAt,
+                        occurredAt: selectedMembersVisitDate?.normalized,
+                        [EVENT_METADATA_KEYS.syntheticForSelectedDate]: false,
+                        ...selectedDateEventValues,
+                    };
+                })()
+                : {};
+
+            return {
+                idx,
+                ...cached,
+                ...records[id],
+                ...selectedDatePatch,
+                ...((recordOverrides[activeOverrideScopeKey] || {})[id] || {}),
+                id,
+            };
+        }),
+        [
+            records,
+            recordsOrder,
+            recordOverrides,
+            activeOverrideScopeKey,
+            isMembersFormPage,
+            selectedMembersVisitDate?.normalized,
+            selectedDateEventsByTei,
+            columns,
+        ],
+    );
+
+    // Effects ----------------------------------------------------------------
+
+    useEffect(() => {
         if (!isMembersFormPage) {
             setLoadingSelectedDateEvents(false);
             return undefined;
@@ -317,15 +325,11 @@ export const useDataSource = (
 
         setLoadingSelectedDateEvents(Boolean(selectedMembersVisitDate?.normalized && selectedDateEventsLoading));
 
-        return () => {
-            setLoadingSelectedDateEvents(false);
-        };
+        return () => { setLoadingSelectedDateEvents(false); };
     }, [isMembersFormPage, selectedDateEventsLoading, selectedMembersVisitDate?.normalized]);
 
-    React.useEffect(() => {
-        if (!isMembersFormPage || !selectedMembersVisitDate?.normalized || !recordsOrder?.length || !records) {
-            return;
-        }
+    useEffect(() => {
+        if (!isMembersFormPage || !selectedMembersVisitDate?.normalized || !recordsOrder?.length || !records) return;
 
         const firstRecord = records[recordsOrder[0]];
         const programId = firstRecord?.[EVENT_METADATA_KEYS.programId];
@@ -334,9 +338,7 @@ export const useDataSource = (
             .map(id => records[id]?.[EVENT_METADATA_KEYS.teiId] || id)
             .filter(Boolean);
 
-        if (!programId || !programStageId || !trackedEntityIds.length) {
-            return;
-        }
+        if (!programId || !programStageId || !trackedEntityIds.length) return;
 
         refetchSelectedDateEvents({
             programId,
@@ -353,29 +355,51 @@ export const useDataSource = (
         currentProgramStageId,
     ]);
 
+    const recordOverride = useCallback(({
+        eventRecord,
+        column,
+        value,
+        object = false,
+    }: {
+        eventRecord: { [key: string]: any };
+        column: { id: string; type: keyof typeof dataElementTypes };
+        value: any;
+        object?: boolean;
+    }) => {
+        const overrideScopeKey = getOverrideScopeKey({
+            isMembersFormPage,
+            selectedMembersVisitDate: selectedMembersVisitDate?.normalized,
+        });
+
+        const overridePatch = object ? { ...value } : { [column.id]: value };
+
+        setRecordOverrides(current =>
+            applyRecordOverridePatch(current, overrideScopeKey, eventRecord.id, overridePatch),
+        );
+    }, [isMembersFormPage, selectedMembersVisitDate?.normalized]);
+
     const persistEventCellValue = useCallback(async ({
         eventRecord,
         column,
-        row
+        row,
     }: {
-        eventRecord: { [key: string]: any },
-        column: { id: string, type: keyof typeof dataElementTypes },
-        row: any
+        eventRecord: { [key: string]: any };
+        column: { id: string; type: keyof typeof dataElementTypes };
+        row: any;
     }) => {
-        const rowId = eventRecord.id;
-
         if (isMembersFormPage && !selectedMembersVisitDate?.normalized) return;
 
-        const { eventId, teiId, enrollmentId, orgUnitId, programId, programStageId: recordProgramStageId, occurredAt: existingOccurredAt } = getEventMetadata(eventRecord);
+        const {
+            eventId,
+            teiId,
+            enrollmentId,
+            orgUnitId,
+            programId,
+            programStageId: recordProgramStageId,
+            occurredAt: existingOccurredAt,
+        } = getEventMetadata(eventRecord);
 
         const programStageId = currentProgramStageId || recordProgramStageId;
-        const shouldReuseExistingEvent = Boolean(eventId) && hasEventForSelectedDate({
-            isMembersFormPage,
-            selectedMembersVisitDate: selectedMembersVisitDate?.normalized,
-            occurredAt: existingOccurredAt,
-        });
-        const targetExistingEventId = shouldReuseExistingEvent ? eventId : undefined;
-        const targetExistingOccurredAt = shouldReuseExistingEvent ? existingOccurredAt : undefined;
 
         if (!teiId || !enrollmentId || !orgUnitId || !programId || !programStageId) {
             log.warn(
@@ -391,7 +415,16 @@ export const useDataSource = (
             return;
         }
 
+        const shouldReuseExistingEvent = Boolean(eventId) && hasEventForSelectedDate({
+            isMembersFormPage,
+            selectedMembersVisitDate: selectedMembersVisitDate?.normalized,
+            occurredAt: existingOccurredAt,
+        });
+
+        const targetExistingEventId = shouldReuseExistingEvent ? eventId : undefined;
+        const targetExistingOccurredAt = shouldReuseExistingEvent ? existingOccurredAt : undefined;
         const targetEventId = rowValueRef.current?.[row]?.[EVENT_METADATA_KEYS.eventId] || targetExistingEventId || generateUID();
+
         const nextOccurredAt = getOccurredAtForSave({
             eventId: targetExistingEventId,
             existingOccurredAt: targetExistingOccurredAt,
@@ -403,19 +436,15 @@ export const useDataSource = (
                 errorCreator('Could not save existing event because occurredAt is missing')({
                     eventId: targetExistingEventId,
                     columnId: column.id,
-                    rowId,
+                    rowId: eventRecord.id,
                 }),
             );
             return;
         }
 
         try {
-            const { [EVENT_METADATA_KEYS.eventId]: _, ...rest } = rowValueRef?.current?.[row] || {};
-            const dataElements = Object.entries(rest)
-                .map(([id, value]) => ({
-                    dataElement: id,
-                    value,
-                }));
+            const { [EVENT_METADATA_KEYS.eventId]: _, ...restRowValues } = rowValueRef?.current?.[row] || {};
+            const dataValues = Object.entries(restRowValues).map(([dataElement, value]) => ({ dataElement, value }));
 
             const mutationResponse: any = await saveEventMutation({
                 events: [{
@@ -427,49 +456,38 @@ export const useDataSource = (
                     programStage: programStageId,
                     status: 'ACTIVE',
                     occurredAt: nextOccurredAt,
-                    dataValues: dataElements,
+                    dataValues,
                 }],
             });
 
             if (!eventId) {
-                const nextRowValue = {
+                rowValueRef.current = {
                     ...rowValueRef.current,
                     [row]: {
                         ...(rowValueRef.current[row] || {}),
                         [EVENT_METADATA_KEYS.eventId]: targetEventId,
                     },
-                }
-                rowValueRef.current = nextRowValue;
+                };
             }
 
             recordOverride({
                 eventRecord,
                 column,
                 value: { loading: false, ...rowValueRef?.current?.[row] },
-                object: true
-            })
+                object: true,
+            });
 
             if (mutationResponse?.stats?.created > 0 || mutationResponse?.stats?.updated > 0) {
-                show({
-                    message: `Dados gravados com sucesso`,
-                    type: { success: true }
-                });
+                show({ message: 'Dados gravados com sucesso', type: { success: true } });
             } else if (mutationResponse?.stats?.ignored > 0) {
-                show({
-                    message: `Ocorreu um erro ao gravar evento`,
-                    type: { crirtical: true }
-                });
+                show({ message: 'Ocorreu um erro ao gravar evento', type: { crirtical: true } });
                 throwIfTrackerMutationFailed(mutationResponse);
             }
-            setTimeout(hide, 5000);
 
-        } catch (error) {
-            show({
-                message: `Ocorreu um erro ao gravar os dados`,
-                type: { critical: true }
-            });
             setTimeout(hide, 5000);
-            return;
+        } catch {
+            show({ message: 'Ocorreu um erro ao gravar os dados', type: { critical: true } });
+            setTimeout(hide, 5000);
         }
 
         if (!targetExistingEventId) {
@@ -477,37 +495,9 @@ export const useDataSource = (
             eventRecord[EVENT_METADATA_KEYS.occurredAt] = nextOccurredAt;
             eventRecord[EVENT_METADATA_KEYS.syntheticForSelectedDate] = true;
         }
-    }, [currentProgramStageId, isMembersFormPage, saveEventMutation, selectedMembersVisitDate?.normalized]);
+    }, [currentProgramStageId, isMembersFormPage, saveEventMutation, selectedMembersVisitDate?.normalized, recordOverride]);
 
-    const recordOverride = ({
-        eventRecord,
-        column,
-        value,
-        object = false,
-    }: {
-        eventRecord: { [key: string]: any },
-        column: { id: string, type: keyof typeof dataElementTypes },
-        value: any,
-        object?: boolean,
-    }) => {
-
-        const overrideScopeKey = getOverrideScopeKey({
-            isMembersFormPage,
-            selectedMembersVisitDate: selectedMembersVisitDate?.normalized,
-        });
-        const rowId = eventRecord.id;
-
-        const overridePatch = object ? {
-            ...value
-        } : {
-            [column.id]: value,
-        }
-
-        setRecordOverrides(currentOverrides => applyRecordOverridePatch(currentOverrides, overrideScopeKey, rowId, overridePatch));
-    };
-
-    const [listData, setListData] = useState<any[]>([]);
-    const orgUnitData = useRecoilValue(orgUnitSchema)
+    // List data builder ------------------------------------------------------
 
     useEffect(() => {
         if (!eventRecordsArray) return;
@@ -517,48 +507,57 @@ export const useDataSource = (
         const buildRows = async () => {
             const results = await Promise.all(
                 eventRecordsArray.map(async (eventRecord, rowIndex) => {
-                    let copyData = { ...eventRecord };
-                    const headers = columns;
+                    const { idx, id, ...rest } = eventRecord;
+                    let copyData = { ...rest };
+
                     const teiRecord = records?.[eventRecord[EVENT_METADATA_KEYS.teiId]];
                     const sanitizedTeiRecord = teiRecord
-                        ? Object.fromEntries(
-                            Object.entries(teiRecord).filter(([key]) => !key.startsWith('__'))
-                        )
+                        ? Object.fromEntries(Object.entries(teiRecord).filter(([key]) => !key.startsWith('__')))
                         : undefined;
 
                     if (sanitizedTeiRecord) {
-                        Object.keys(sanitizedTeiRecord).forEach(key => {
-                            delete copyData[key];
-                        });
+                        Object.keys(sanitizedTeiRecord).forEach(key => { delete copyData[key]; });
                         copyData = Object.fromEntries(
-                            Object.entries(copyData).filter(([key]) => !key.startsWith('__'))
+                            Object.entries(copyData).filter(([key]) => !key.startsWith('__')),
                         );
                     }
 
-                    let updated = columns;
+                    let updatedColumns = columns;
 
                     if (isMembersFormPage) {
                         const effects: any = await CustomRunRulesForNewEvent({
-                            currentEvent: copyData,
+                            currentEvent: makeNumbers(columns, copyData),
                             orgUnit: orgUnitData,
                             querySingleResource,
                             rulesExecutionDependenciesClientFormatted: {
                                 attributeValues: sanitizedTeiRecord as any,
                                 enrollmentData: {
                                     enrollmentId: records?.[eventRecord[EVENT_METADATA_KEYS.teiId]]?.[EVENT_METADATA_KEYS.enrollmentId],
-                                    enrolledAt: "",
-                                    occurredAt: ""
+                                    enrolledAt: '',
+                                    occurredAt: '',
                                 },
-                                events: []
-                            }
+                                events: [],
+                            },
                         });
 
-                        updated = applyEffectsToHeaders(headers, effects);
-                        const generalError = effects?.SHOWERROR?.general?.[0];
+                        updatedColumns = applyEffectsToHeaders(columns, effects);
 
-                        if (generalError)
+                        const generalError = effects?.SHOWERROR?.general?.[0];
+                        const columnsWithValue = updatedColumns.filter(col => col.value);
+                        const ruleValues = Object.fromEntries(columnsWithValue.map(({ id, value }) => [id, value]));
+
+                        rowValueRef.current = {
+                            ...rowValueRef.current,
+                            [rowIndex]: {
+                                idx: eventRecord.idx,
+                                ...(rowValueRef.current[rowIndex] || {}),
+                                ...makeNumbers(columns, ruleValues),
+                            },
+                        };
+
+                        if (generalError) {
                             setDisplayTextRule(prev => {
-                                if (generalError && !prev.find(x => x.key === rowIndex)) {
+                                if (!prev.find(x => x.key === rowIndex)) {
                                     return [
                                         ...prev,
                                         {
@@ -568,18 +567,15 @@ export const useDataSource = (
                                         },
                                     ];
                                 }
-
-                                if (!generalError) {
-                                    return prev?.filter(x => x.key !== rowIndex) || [];
-                                }
-
                                 return prev;
                             });
+                        } else {
+                            setDisplayTextRule(prev => prev?.filter(x => x.key !== rowIndex) || []);
+                        }
                     }
 
-
                     const listRecord = columns
-                        .filter(column => column.visible)
+                        .filter(col => col.visible)
                         .reduce((acc, column) => {
                             const { id, type, options, resolveValue } = column;
                             const clientValue = eventRecord[id];
@@ -607,62 +603,56 @@ export const useDataSource = (
                                 acc[id] = React.createElement(
                                     'div',
                                     { style: { display: 'flex', gap: '8px' } },
-                                    React.createElement(
-                                        Button,
-                                        {
-                                            small: true,
-                                            loading: eventRecord?.loading,
-                                            disabled: !Boolean(rowValueRef.current?.[rowIndex]),
-                                            onClick: () => {
-                                                const required: any = updated?.filter(x => x.required);
-                                                const error: any = updated?.filter(x => x.error);
-                                                const conjunto = [...error, ...required];
+                                    React.createElement(Button, {
+                                        small: true,
+                                        loading: eventRecord?.loading,
+                                        disabled: !Boolean(rowValueRef.current?.[rowIndex]),
+                                        onClick: () => {
+                                            const required: any = updatedColumns?.filter(x => x.required);
+                                            const error: any = updatedColumns?.filter(x => x.error);
+                                            const conjunto = [...error, ...required];
 
-                                                if (required?.length > 0 || error?.length > 0) {
-                                                    for (let req of conjunto) {
-                                                        if (!eventRecord[req.id]) {
-                                                            show({
-                                                                message: `O campo "${req?.header}" é obrigatório!`,
-                                                                type: { warning: true }
-                                                            });
-                                                            setTimeout(hide, 5000);
-                                                            return;
-                                                        }
+                                            if (required?.length > 0 || error?.length > 0) {
+                                                for (const req of conjunto) {
+                                                    if (!eventRecord[req.id]) {
+                                                        show({
+                                                            message: `O campo "${req?.header}" é obrigatório!`,
+                                                            type: { warning: true },
+                                                        });
+                                                        setTimeout(hide, 5000);
+                                                        return;
                                                     }
                                                 }
-
-                                                recordOverride({ eventRecord, column, value: { loading: true }, object: true });
-                                                void persistEventCellValue({ eventRecord, column, row: rowIndex });
                                             }
+
+                                            recordOverride({ eventRecord, column, value: { loading: true }, object: true });
+                                            void persistEventCellValue({ eventRecord, column, row: rowIndex });
                                         },
-                                        '💾 Gravar'
-                                    )
+                                    }, '💾 Gravar'),
                                 );
                                 return acc;
                             }
 
                             if (isMembersFormPage && column.additionalColumn) {
-                                const thisHeader = updated?.find(x => x.id == column.id);
+                                const thisHeader = updatedColumns?.find(x => x.id === column.id);
 
                                 acc[id] = React.createElement(InlineEventCellField, {
                                     key: `${eventRecord.id}-${id}`,
                                     column: thisHeader as any,
                                     value: thisHeader && 'value' in thisHeader ? thisHeader.value : clientValue,
                                     ...((isMembersFormLocked || eventRecord.loading)
-                                        ? { disabled: (isMembersFormLocked || eventRecord.loading) }
+                                        ? { disabled: isMembersFormLocked || eventRecord.loading }
                                         : {}),
                                     saveStatus: 'idle',
                                     onCommit: (nextClientValue: any) => {
-
                                         recordOverride({ eventRecord, column, value: nextClientValue });
-                                        const nextRowValue = {
+                                        rowValueRef.current = {
                                             ...rowValueRef.current,
                                             [rowIndex]: {
                                                 ...(rowValueRef.current[rowIndex] || {}),
                                                 [column.id]: nextClientValue,
                                             },
                                         };
-                                        rowValueRef.current = nextRowValue;
                                     },
                                 });
                                 return acc;
@@ -672,14 +662,11 @@ export const useDataSource = (
                                 acc[id] = resolveValue()[clientValue];
                             } else if (options) {
                                 if (type === dataElementTypes.MULTI_TEXT) {
-                                    const dataElement = createDataElement(column);
-                                    acc[id] = convertClientToList(clientValue, type, dataElement);
+                                    acc[id] = convertClientToList(clientValue, type, createDataElement(column));
                                 } else {
                                     const option = options.find(o => o.value === clientValue);
                                     if (!option) {
-                                        log.error(
-                                            errorCreator('Missing value in options')({ id, clientValue, options }),
-                                        );
+                                        log.error(errorCreator('Missing value in options')({ id, clientValue, options }));
                                         acc[id] = convertClientToList(clientValue, type);
                                     } else {
                                         acc[id] = option.text;
@@ -692,23 +679,16 @@ export const useDataSource = (
                             return acc;
                         }, {});
 
-                    return {
-                        ...listRecord,
-                        id: eventRecord.id,
-                    };
-                })
+                    return { ...listRecord, id: eventRecord.id };
+                }),
             );
 
-            if (!cancelled) {
-                setListData(results);
-            }
+            if (!cancelled) setListData(results);
         };
 
         buildRows();
 
-        return () => {
-            cancelled = true;
-        };
+        return () => { cancelled = true; };
     }, [
         eventRecordsArray,
         columns,
@@ -716,6 +696,7 @@ export const useDataSource = (
         isMembersFormPage,
         isMembersFormLocked,
         persistEventCellValue,
+        recordOverride,
     ]);
 
     return { listData };
