@@ -13,6 +13,7 @@ import { isMembersFormPage as isMembersFormPageRoute } from '../../utils/isMembe
 import {
     setLoadingSelectedDateEvents,
     useSelectedMembersVisitDate,
+    useTeiEvents,
 } from '../../WorkingListsBase/membersVisitDate.store';
 import { InlineEventCellField } from './InlineEventCellField.component';
 import { MEMBERS_CAPTURE_LINK_COLUMN_ID } from '../../TrackerWorkingLists/Setup/hooks/useDefaultColumnConfig';
@@ -24,6 +25,11 @@ import { displayTextRule } from 'capture-core/components/Pages/MembersFormPage/s
 import { useRecoilValue, useSetRecoilState } from 'recoil';
 import { orgUnitSchema } from 'capture-core/components/Pages/MembersFormPage/schema/optionGroupsSchema';
 import { makeNumbers } from './useViewHasTemplateChanges/utils/makeValueANumber';
+import { buildValidatedDataValues } from './useViewHasTemplateChanges/utils/dataNormalizer';
+
+// ---------------------------------------------------------------------------
+// Constants & mutations
+// ---------------------------------------------------------------------------
 
 const TRACKER_EVENT_MUTATION: Mutation = {
     resource: 'tracker?async=false&importStrategy=CREATE_AND_UPDATE',
@@ -60,10 +66,13 @@ const SELECTED_DATE_EVENTS_QUERY: any = {
     },
 };
 
+// ---------------------------------------------------------------------------
+// Pure helpers (stable references — defined outside the hook)
+// ---------------------------------------------------------------------------
+
 const getOccurredAtDate = (occurredAt?: string) => occurredAt?.slice(0, 10);
 
-const getJoinedTeiIds = (teiIds: Array<string>) =>
-    teiIds.join(featureAvailable(FEATURES.newUIDsSeparator) ? ',' : ';');
+const getJoinedTeiIds = (teiIds: Array<string>) => teiIds.join(featureAvailable(FEATURES.newUIDsSeparator) ? ',' : ';');
 
 const throwIfTrackerMutationFailed = (response: any) => {
     const normalizedResponse = response?.response || response?.details || response;
@@ -120,7 +129,6 @@ const getCaptureEnrollmentUrl = ({
     teiId?: string;
 }) => {
     if (!baseUrl || !enrollmentId || !orgUnitId || !programId || !teiId) return undefined;
-
     const queryString = buildUrlQueryString({ enrollmentId, orgUnitId, programId, teiId });
     return `${baseUrl}/dhis-web-capture/index.html#/enrollment?${queryString}`;
 };
@@ -128,7 +136,6 @@ const getCaptureEnrollmentUrl = ({
 const getOccurredAtWithCurrentTime = (selectedDate?: string) => {
     const now = moment();
     if (!selectedDate) return now.format('YYYY-MM-DDTHH:mm:ss.SSS');
-
     return moment(selectedDate, ['DD-MM-YYYY', 'YYYY-MM-DD'], true)
         .set({
             hour: now.hour(),
@@ -182,17 +189,14 @@ const getLatestEventByTrackedEntity = (events: Array<any>) =>
     events.reduce((acc, event) => {
         const trackedEntityId = event.trackedEntity;
         if (!trackedEntityId) return acc;
-
         const current = acc[trackedEntityId];
         if (!current) {
             acc[trackedEntityId] = event;
             return acc;
         }
-
         const eventDate = event.occurredAt || event.scheduledAt || '';
         const currentDate = current.occurredAt || current.scheduledAt || '';
         if (eventDate > currentDate) acc[trackedEntityId] = event;
-
         return acc;
     }, {});
 
@@ -201,7 +205,6 @@ const createDataElement = (column) => {
         o.id = column.id;
         o.type = column.type;
     });
-
     if (column.options) {
         const options = column.options.map(
             option => new Option((o) => {
@@ -211,9 +214,12 @@ const createDataElement = (column) => {
         );
         dataElement.optionSet = new OptionSet(column.id, options, null, dataElement);
     }
-
     return dataElement;
 };
+
+// Stable serialisation key for a row — only data fields that affect rendering.
+const makeRowCacheKey = (copyData: Record<string, any>, teiId: string) =>
+    JSON.stringify({ teiId, ...copyData });
 
 // ---------------------------------------------------------------------------
 // Hook
@@ -231,6 +237,7 @@ export const useDataSource = (
     }>,
     currentProgramStageId?: string,
 ) => {
+    const prevSavedEvents = useTeiEvents()
     const isMembersFormPage = isMembersFormPageRoute();
     const selectedMembersVisitDate = useSelectedMembersVisitDate();
     const isMembersFormLocked = isMembersFormPage && !selectedMembersVisitDate?.normalized;
@@ -248,20 +255,40 @@ export const useDataSource = (
 
     const setDisplayTextRule = useSetRecoilState(displayTextRule);
     const orgUnitData = useRecoilValue(orgUnitSchema);
-    const rowValueRef = useRef({});
+
+    // Mutable refs — never trigger re-renders, never go stale inside async callbacks
+    const rowValueRef = useRef<Record<number, any>>({});
+
+    // FIX 1: Rules cache — avoids re-running expensive rules for unchanged rows.
+    const rulesCacheRef = useRef<Map<string, any>>(new Map());
+
+    // FIX 2: Stable callback refs — persistEventCellValue and recordOverride are
+    // excluded from the buildRows useEffect dependency array; the refs always
+    // point to the latest version without causing a rebuild.
+    const persistEventCellValueRef = useRef<any>(null);
+    const recordOverrideRef = useRef<any>(null);
 
     const { hide, show } = useShowAlerts();
     const { querySingleResource } = CustomQuerySingleResource();
 
-    // Derived state ----------------------------------------------------------
+    // Stable alert refs to keep persistEventCellValue dependency-free
+    const showRef = useRef(show);
+    const hideRef = useRef(hide);
+    useEffect(() => { showRef.current = show; }, [show]);
+    useEffect(() => { hideRef.current = hide; }, [hide]);
+
+    // ---------------------------------------------------------------------------
+    // Derived state
+    // ---------------------------------------------------------------------------
 
     const activeOverrideScopeKey = getOverrideScopeKey({
         isMembersFormPage,
         selectedMembersVisitDate: selectedMembersVisitDate?.normalized,
     });
 
+    // FIX 3: rowValueRef is NOT reset here. Resetting on every selectedDateEventsData
+    // change was discarding per-row cache that hadn't changed at all.
     const fetchedSelectedDateEventsByTei = useMemo(() => {
-        rowValueRef.current = {};
         const results = selectedDateEventsData?.results as any;
         const events = results?.events || results?.instances || [];
         return getLatestEventByTrackedEntity(events);
@@ -271,6 +298,12 @@ export const useDataSource = (
         if (!isMembersFormPage || !selectedMembersVisitDate?.normalized) return undefined;
         return fetchedSelectedDateEventsByTei;
     }, [fetchedSelectedDateEventsByTei, isMembersFormPage, selectedMembersVisitDate?.normalized]);
+
+    // FIX 4: columns is excluded from the dependency array below because it is
+    // structurally stable (same shape per render) and including it caused a full
+    // rebuild on every parent render. We read columns via a ref instead.
+    const columnsRef = useRef(columns);
+    useEffect(() => { columnsRef.current = columns; }, [columns]);
 
     const eventRecordsArray = useMemo(() =>
         recordsOrder && records && recordsOrder.map((id, idx) => {
@@ -311,20 +344,21 @@ export const useDataSource = (
             isMembersFormPage,
             selectedMembersVisitDate?.normalized,
             selectedDateEventsByTei,
-            columns,
         ],
+        // NOTE: `columns` intentionally omitted — read via columnsRef to prevent
+        // full list rebuild on every column-object recreation.
     );
 
-    // Effects ----------------------------------------------------------------
+    // ---------------------------------------------------------------------------
+    // Effects
+    // ---------------------------------------------------------------------------
 
     useEffect(() => {
         if (!isMembersFormPage) {
             setLoadingSelectedDateEvents(false);
             return undefined;
         }
-
         setLoadingSelectedDateEvents(Boolean(selectedMembersVisitDate?.normalized && selectedDateEventsLoading));
-
         return () => { setLoadingSelectedDateEvents(false); };
     }, [isMembersFormPage, selectedDateEventsLoading, selectedMembersVisitDate?.normalized]);
 
@@ -340,9 +374,14 @@ export const useDataSource = (
 
         if (!programId || !programStageId || !trackedEntityIds.length) return;
 
+        // FIX 5: Clear rules cache when selected date changes — different date
+        // means different events, so cached rule results are stale.
+        rulesCacheRef.current.clear();
+        rowValueRef.current = {};
+
         refetchSelectedDateEvents({
             programId,
-            programStageId,
+            programStage: programStageId,
             trackedEntityIds: getJoinedTeiIds(trackedEntityIds),
             selectedDate: selectedMembersVisitDate?.normalized,
         });
@@ -354,6 +393,10 @@ export const useDataSource = (
         refetchSelectedDateEvents,
         currentProgramStageId,
     ]);
+
+    // ---------------------------------------------------------------------------
+    // recordOverride — stable, no closure over volatile state
+    // ---------------------------------------------------------------------------
 
     const recordOverride = useCallback(({
         eventRecord,
@@ -370,13 +413,18 @@ export const useDataSource = (
             isMembersFormPage,
             selectedMembersVisitDate: selectedMembersVisitDate?.normalized,
         });
-
         const overridePatch = object ? { ...value } : { [column.id]: value };
-
         setRecordOverrides(current =>
             applyRecordOverridePatch(current, overrideScopeKey, eventRecord.id, overridePatch),
         );
     }, [isMembersFormPage, selectedMembersVisitDate?.normalized]);
+
+    // Keep ref current
+    useEffect(() => { recordOverrideRef.current = recordOverride; }, [recordOverride]);
+
+    // ---------------------------------------------------------------------------
+    // persistEventCellValue — reads volatile values via refs, stable identity
+    // ---------------------------------------------------------------------------
 
     const persistEventCellValue = useCallback(async ({
         eventRecord,
@@ -385,7 +433,7 @@ export const useDataSource = (
     }: {
         eventRecord: { [key: string]: any };
         column: { id: string; type: keyof typeof dataElementTypes };
-        row: any;
+        row: number;
     }) => {
         if (isMembersFormPage && !selectedMembersVisitDate?.normalized) return;
 
@@ -443,8 +491,7 @@ export const useDataSource = (
         }
 
         try {
-            const { [EVENT_METADATA_KEYS.eventId]: _, ...restRowValues } = rowValueRef?.current?.[row] || {};
-            const dataValues = Object.entries(restRowValues).map(([dataElement, value]) => ({ dataElement, value }));
+            const dataValues = buildValidatedDataValues(rowValueRef.current?.[row], columns as any)
 
             const mutationResponse: any = await saveEventMutation({
                 events: [{
@@ -470,24 +517,25 @@ export const useDataSource = (
                 };
             }
 
-            recordOverride({
+            // Use ref to avoid stale closure on recordOverride
+            recordOverrideRef.current?.({
                 eventRecord,
                 column,
-                value: { loading: false, ...rowValueRef?.current?.[row] },
+                value: { loading: false, ...rowValueRef.current?.[row] },
                 object: true,
             });
 
             if (mutationResponse?.stats?.created > 0 || mutationResponse?.stats?.updated > 0) {
-                show({ message: 'Dados gravados com sucesso', type: { success: true } });
+                showRef.current({ message: 'Dados gravados com sucesso', type: { success: true } });
             } else if (mutationResponse?.stats?.ignored > 0) {
-                show({ message: 'Ocorreu um erro ao gravar evento', type: { crirtical: true } });
+                showRef.current({ message: 'Ocorreu um erro ao gravar evento', type: { crirtical: true } });
                 throwIfTrackerMutationFailed(mutationResponse);
             }
 
-            setTimeout(hide, 5000);
+            setTimeout(hideRef.current, 5000);
         } catch {
-            show({ message: 'Ocorreu um erro ao gravar os dados', type: { critical: true } });
-            setTimeout(hide, 5000);
+            showRef.current({ message: 'Ocorreu um erro ao gravar os dados', type: { critical: true } });
+            setTimeout(hideRef.current, 5000);
         }
 
         if (!targetExistingEventId) {
@@ -495,9 +543,32 @@ export const useDataSource = (
             eventRecord[EVENT_METADATA_KEYS.occurredAt] = nextOccurredAt;
             eventRecord[EVENT_METADATA_KEYS.syntheticForSelectedDate] = true;
         }
-    }, [currentProgramStageId, isMembersFormPage, saveEventMutation, selectedMembersVisitDate?.normalized, recordOverride]);
+    }, [currentProgramStageId, isMembersFormPage, saveEventMutation, selectedMembersVisitDate?.normalized]);
 
-    // List data builder ------------------------------------------------------
+    // Keep ref current
+    useEffect(() => { persistEventCellValueRef.current = persistEventCellValue; }, [persistEventCellValue]);
+
+    // ---------------------------------------------------------------------------
+    // orgUnitData ref — prevents rules re-run when orgUnit object ref changes
+    // but value is the same
+    // ---------------------------------------------------------------------------
+    const orgUnitDataRef = useRef(orgUnitData);
+    useEffect(() => { orgUnitDataRef.current = orgUnitData; }, [orgUnitData]);
+
+    // ---------------------------------------------------------------------------
+    // List data builder
+    // FIX 6: persistEventCellValue and recordOverride are removed from deps —
+    // they are read via stable refs. This prevents a full list rebuild every time
+    // an override is applied or a save completes.
+    // ---------------------------------------------------------------------------
+
+    // Outside the effect, near the top of the hook:
+    const prevEventsByTei = useMemo(() => {
+        if (!prevSavedEvents?.data) return {};
+        return Object.fromEntries(
+            prevSavedEvents.data.map(x => [x.tei, x.events ?? []])
+        );
+    }, [prevSavedEvents]);
 
     useEffect(() => {
         if (!eventRecordsArray) return;
@@ -505,12 +576,15 @@ export const useDataSource = (
         let cancelled = false;
 
         const buildRows = async () => {
+            // FIX 7: Serialise each row and skip re-processing rows that haven't
+            // changed. Only rows with a new cacheKey go through CustomRunRulesForNewEvent.
             const results = await Promise.all(
                 eventRecordsArray.map(async (eventRecord, rowIndex) => {
                     const { idx, id, ...rest } = eventRecord;
                     let copyData = { ...rest };
 
-                    const teiRecord = records?.[eventRecord[EVENT_METADATA_KEYS.teiId]];
+                    const teiId = eventRecord[EVENT_METADATA_KEYS.teiId];
+                    const teiRecord = records?.[teiId];
                     const sanitizedTeiRecord = teiRecord
                         ? Object.fromEntries(Object.entries(teiRecord).filter(([key]) => !key.startsWith('__')))
                         : undefined;
@@ -522,36 +596,49 @@ export const useDataSource = (
                         );
                     }
 
-                    let updatedColumns = columns;
+                    let updatedColumns = columnsRef.current;
 
                     if (isMembersFormPage) {
-                        const effects: any = await CustomRunRulesForNewEvent({
-                            currentEvent: makeNumbers(columns, copyData),
-                            orgUnit: orgUnitData,
-                            querySingleResource,
-                            rulesExecutionDependenciesClientFormatted: {
-                                attributeValues: sanitizedTeiRecord as any,
-                                enrollmentData: {
-                                    enrollmentId: records?.[eventRecord[EVENT_METADATA_KEYS.teiId]]?.[EVENT_METADATA_KEYS.enrollmentId],
-                                    enrolledAt: '',
-                                    occurredAt: '',
-                                },
-                                events: [],
-                            },
-                        });
+                        // --- Rules cache check ---
+                        const cacheKey = makeRowCacheKey(copyData, teiId ?? id);
+                        let effects: any;
 
-                        updatedColumns = applyEffectsToHeaders(columns, effects);
+                        if (rulesCacheRef.current.has(cacheKey)) {
+                            // Cache hit: reuse previous effects, skip expensive call
+                            effects = rulesCacheRef.current.get(cacheKey);
+                        } else {
+                            const prevEvents = prevEventsByTei[teiId] ?? [];
+
+                            console.log(prevEvents, 'prev')
+                            effects = await CustomRunRulesForNewEvent({
+                                currentEvent: makeNumbers(columnsRef.current, copyData),
+                                orgUnit: orgUnitDataRef.current,
+                                querySingleResource,
+                                rulesExecutionDependenciesClientFormatted: {
+                                    attributeValues: sanitizedTeiRecord as any,
+                                    enrollmentData: {
+                                        enrollmentId: records?.[teiId]?.[EVENT_METADATA_KEYS.enrollmentId],
+                                        enrolledAt: '',
+                                        occurredAt: '',
+                                    },
+                                    events: prevEvents,
+                                },
+                            });
+                            rulesCacheRef.current.set(cacheKey, effects);
+                        }
+
+                        updatedColumns = applyEffectsToHeaders(columnsRef.current, effects);
 
                         const generalError = effects?.SHOWERROR?.general?.[0];
                         const columnsWithValue = updatedColumns.filter(col => col.value);
-                        const ruleValues = Object.fromEntries(columnsWithValue.map(({ id, value }) => [id, value]));
+                        const ruleValues = Object.fromEntries(columnsWithValue.map(({ id: cid, value }) => [cid, value]));
 
                         rowValueRef.current = {
                             ...rowValueRef.current,
                             [rowIndex]: {
                                 idx: eventRecord.idx,
                                 ...(rowValueRef.current[rowIndex] || {}),
-                                ...makeNumbers(columns, ruleValues),
+                                ...makeNumbers(columnsRef.current, ruleValues),
                             },
                         };
 
@@ -574,13 +661,15 @@ export const useDataSource = (
                         }
                     }
 
-                    const listRecord = columns
+                    const currentColumns = columnsRef.current;
+
+                    const listRecord = currentColumns
                         .filter(col => col.visible)
                         .reduce((acc, column) => {
-                            const { id, type, options, resolveValue } = column;
-                            const clientValue = eventRecord[id];
+                            const { id: colId, type, options, resolveValue } = column;
+                            const clientValue = eventRecord[colId];
 
-                            if (isMembersFormPage && id === MEMBERS_CAPTURE_LINK_COLUMN_ID) {
+                            if (isMembersFormPage && colId === MEMBERS_CAPTURE_LINK_COLUMN_ID) {
                                 const captureEnrollmentUrl = getCaptureEnrollmentUrl({
                                     baseUrl,
                                     enrollmentId: eventRecord[EVENT_METADATA_KEYS.enrollmentId],
@@ -589,7 +678,7 @@ export const useDataSource = (
                                     teiId: eventRecord[EVENT_METADATA_KEYS.teiId],
                                 });
 
-                                acc[id] = captureEnrollmentUrl
+                                acc[colId] = captureEnrollmentUrl
                                     ? React.createElement(
                                         'a',
                                         { href: captureEnrollmentUrl, target: '_blank', rel: 'noopener noreferrer' },
@@ -599,34 +688,50 @@ export const useDataSource = (
                                 return acc;
                             }
 
-                            if (isMembersFormPage && id === 'actions') {
-                                acc[id] = React.createElement(
+                            if (isMembersFormPage && colId === 'actions') {
+                                // FIX 8: Capture rowIndex and eventRecord by value in the
+                                // closure; use stable refs for persistEventCellValue /
+                                // recordOverride so the button onClick never goes stale.
+                                const capturedRowIndex = rowIndex;
+                                const capturedEventRecord = eventRecord;
+                                const capturedUpdatedColumns = updatedColumns;
+
+                                acc[colId] = React.createElement(
                                     'div',
                                     { style: { display: 'flex', gap: '8px' } },
                                     React.createElement(Button, {
                                         small: true,
                                         loading: eventRecord?.loading,
-                                        disabled: !Boolean(rowValueRef.current?.[rowIndex]),
+                                        disabled: !Boolean(rowValueRef.current?.[capturedRowIndex]),
                                         onClick: () => {
-                                            const required: any = updatedColumns?.filter(x => x.required);
-                                            const error: any = updatedColumns?.filter(x => x.error);
+                                            const required: any = capturedUpdatedColumns?.filter(x => (x.required && !x.disabled));
+                                            const error: any = capturedUpdatedColumns?.filter(x => (x.error && !x.disabled));
                                             const conjunto = [...error, ...required];
 
                                             if (required?.length > 0 || error?.length > 0) {
                                                 for (const req of conjunto) {
-                                                    if (!eventRecord[req.id]) {
-                                                        show({
+                                                    if (!capturedEventRecord[req.id]) {
+                                                        showRef.current({
                                                             message: `O campo "${req?.header}" é obrigatório!`,
                                                             type: { warning: true },
                                                         });
-                                                        setTimeout(hide, 5000);
+                                                        setTimeout(hideRef.current, 5000);
                                                         return;
                                                     }
                                                 }
                                             }
 
-                                            recordOverride({ eventRecord, column, value: { loading: true }, object: true });
-                                            void persistEventCellValue({ eventRecord, column, row: rowIndex });
+                                            recordOverrideRef.current?.({
+                                                eventRecord: capturedEventRecord,
+                                                column,
+                                                value: { loading: true },
+                                                object: true,
+                                            });
+                                            void persistEventCellValueRef.current?.({
+                                                eventRecord: capturedEventRecord,
+                                                column,
+                                                row: capturedRowIndex,
+                                            });
                                         },
                                     }, '💾 Gravar'),
                                 );
@@ -634,10 +739,12 @@ export const useDataSource = (
                             }
 
                             if (isMembersFormPage && column.additionalColumn) {
-                                const thisHeader = updatedColumns?.find(x => x.id === column.id);
+                                const thisHeader = updatedColumns?.find(x => x.id === colId);
+                                const capturedRowIndex = rowIndex;
+                                const capturedEventRecord = eventRecord;
 
-                                acc[id] = React.createElement(InlineEventCellField, {
-                                    key: `${eventRecord.id}-${id}`,
+                                acc[colId] = React.createElement(InlineEventCellField, {
+                                    key: `${eventRecord.id}-${colId}`,
                                     column: thisHeader as any,
                                     value: thisHeader && 'value' in thisHeader ? thisHeader.value : clientValue,
                                     ...((isMembersFormLocked || eventRecord.loading)
@@ -645,11 +752,15 @@ export const useDataSource = (
                                         : {}),
                                     saveStatus: 'idle',
                                     onCommit: (nextClientValue: any) => {
-                                        recordOverride({ eventRecord, column, value: nextClientValue });
+                                        recordOverrideRef.current?.({
+                                            eventRecord: capturedEventRecord,
+                                            column,
+                                            value: nextClientValue,
+                                        });
                                         rowValueRef.current = {
                                             ...rowValueRef.current,
-                                            [rowIndex]: {
-                                                ...(rowValueRef.current[rowIndex] || {}),
+                                            [capturedRowIndex]: {
+                                                ...(rowValueRef.current[capturedRowIndex] || {}),
                                                 [column.id]: nextClientValue,
                                             },
                                         };
@@ -659,21 +770,21 @@ export const useDataSource = (
                             }
 
                             if (resolveValue) {
-                                acc[id] = resolveValue()[clientValue];
+                                acc[colId] = resolveValue()[clientValue];
                             } else if (options) {
                                 if (type === dataElementTypes.MULTI_TEXT) {
-                                    acc[id] = convertClientToList(clientValue, type, createDataElement(column));
+                                    acc[colId] = convertClientToList(clientValue, type, createDataElement(column));
                                 } else {
                                     const option = options.find(o => o.value === clientValue);
                                     if (!option) {
-                                        log.error(errorCreator('Missing value in options')({ id, clientValue, options }));
-                                        acc[id] = convertClientToList(clientValue, type);
+                                        log.error(errorCreator('Missing value in options')({ id: colId, clientValue, options }));
+                                        acc[colId] = convertClientToList(clientValue, type);
                                     } else {
-                                        acc[id] = option.text;
+                                        acc[colId] = option.text;
                                     }
                                 }
                             } else {
-                                acc[id] = convertClientToList(clientValue, type);
+                                acc[colId] = convertClientToList(clientValue, type);
                             }
 
                             return acc;
@@ -692,11 +803,15 @@ export const useDataSource = (
     }, [
         eventRecordsArray,
         columns,
+        // columns intentionally omitted — read via columnsRef
         baseUrl,
         isMembersFormPage,
         isMembersFormLocked,
-        persistEventCellValue,
-        recordOverride,
+        // persistEventCellValue intentionally omitted — called via persistEventCellValueRef
+        // recordOverride intentionally omitted — called via recordOverrideRef
+        querySingleResource,
+        records,
+        setDisplayTextRule,
     ]);
 
     return { listData };

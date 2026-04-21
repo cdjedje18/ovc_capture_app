@@ -2,6 +2,7 @@ import moment from 'moment';
 import { useSyncExternalStore } from 'react';
 
 let state: { original: string, normalized: string } | any;
+let events: any;
 
 let availableDates: Array<string> = [];
 let loadingSelectedDateEvents = false;
@@ -37,6 +38,16 @@ export const setSelectedMembersVisitDate = (
 
     emit();
 };
+
+export const setTeiEvents = (
+    data: any[]
+) => {
+
+    events = { data: data }
+
+    emit();
+};
+
 export const setAvailableMembersVisitDates = (dates: Array<string>) => {
     const uniqueSortedDates = Array.from(new Set(dates.filter(Boolean))).sort((a, b) => b.localeCompare(a));
     const didChange = availableDates.length !== uniqueSortedDates.length
@@ -65,6 +76,14 @@ export const useSelectedMembersVisitDate = () =>
         () => state,
         () => undefined,
     );
+
+export const useTeiEvents = () =>
+    useSyncExternalStore(
+        subscribe,
+        () => events,
+        () => undefined,
+    );
+
 
 export const useAvailableMembersVisitDates = () =>
     useSyncExternalStore(
