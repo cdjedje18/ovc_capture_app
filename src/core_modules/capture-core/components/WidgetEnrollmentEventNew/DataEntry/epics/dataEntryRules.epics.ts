@@ -24,6 +24,77 @@ import { getLocationQuery } from '../../../../utils/routing';
 import { getCoreOrgUnitFn, orgUnitFetched } from '../../../../metadataRetrieval/coreOrgUnit';
 import type { QuerySingleResource } from '../../../../utils/api';
 
+function normalizeBooleanStrings(obj: any) {
+    if (Array.isArray(obj)) {
+        return obj.map(normalizeBooleanStrings);
+    }
+
+    if (obj !== null && typeof obj === 'object') {
+        const newObj = {};
+
+        for (const key in obj) {
+            const value = obj[key];
+
+            if (value === "true") {
+                newObj[key] = true;
+            } else if (value === "false") {
+                newObj[key] = false;
+            } else {
+                newObj[key] = normalizeBooleanStrings(value);
+            }
+        }
+
+        return newObj;
+    }
+
+    return obj;
+}
+
+export const CustomRunRulesForNewEvent = async ({
+    rulesExecutionDependenciesClientFormatted,
+    querySingleResource,
+    orgUnit,
+    currentEvent
+}: {
+    currentEvent: any
+    orgUnit: any
+    rulesExecutionDependenciesClientFormatted: RulesExecutionDependenciesClientFormatted;
+    querySingleResource: QuerySingleResource;
+}) => {
+    const { events, attributeValues, enrollmentData } = rulesExecutionDependenciesClientFormatted;
+    const { entryProgram, stageId }: { entryProgram: string; stageId: string } = getLocationQuery();
+
+    const program = getTrackerProgramThrowIfNotFound(entryProgram);
+    const stage = program.getStage(localStorage.getItem('dataEntryStage')!);
+    if (!stage) {
+        throw Error(i18n.t('Program stage not found'));
+    }
+
+    const foundation = stage.stageForm;
+    const programStageId = foundation.id;
+    const { code, groups, ...rest } = orgUnit
+    const currEvent = { ...currentEvent, orgUnit: { ...rest }, programStageId }
+
+    const effects = getApplicableRuleEffectsForTrackerProgram({
+        program,
+        stage,
+        orgUnit,
+        currentEvent: normalizeBooleanStrings(currEvent),
+        otherEvents: events,
+        attributeValues,
+        enrollmentData,
+    });
+
+    const effectsWithValidations = await validateAssignEffects({
+        dataElements: foundation.getElements(),
+        effects,
+        querySingleResource,
+    });
+
+    return effectsWithValidations
+};
+
+
 const runRulesForNewEvent = async ({
     store,
     dataEntryId,
@@ -81,7 +152,7 @@ const runRulesForNewEvent = async ({
         rulesExecutedPostUpdateField(dataEntryId, itemId, uid),
         ...(coreOrgUnit && !cached ? [orgUnitFetched(coreOrgUnit)] : []),
     ],
-    newEventWidgetDataEntryBatchActionTypes.RULES_EFFECTS_ACTIONS_BATCH,
+        newEventWidgetDataEntryBatchActionTypes.RULES_EFFECTS_ACTIONS_BATCH,
     );
 };
 

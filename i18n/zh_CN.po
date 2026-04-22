@@ -794,7 +794,7 @@ msgstr ""
 msgid "Please select a valid combination."
 msgstr ""
 
-msgid "Get started with Capture app"
+msgid "Get started with OVC Capture App"
 msgstr "开始使用采集应用程序"
 
 msgid "Report data"
@@ -2190,3 +2190,4 @@ msgid ""
 "restrictions. For better performance, use another browser or exit private "
 "mode if this is currently in use."
 msgstr ""
+

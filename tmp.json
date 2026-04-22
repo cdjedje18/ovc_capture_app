@@ -1,0 +1,88 @@
+console.log(rulesExecutionDependenciesClientFormatted,currentEventValues,currentEventMainData,orgUnit)
+
+1.{
+  "events": [],
+  "attributeValues": {
+    "XtNcL8JgOxp": "Fernanda Domingos",
+    "knaCOGZ84gp": "2025-10-23T22:00:00.000Z",
+    "PP0L2IEL4Dm": "Luisa Zacarias",
+    "GoH4WWhcaCz": "C/AVHIV recém diagnosticada / revelada ser HIV+",
+    "qZeHF6zG3Zx": "7 de Abril",
+    "jvxnIFUs8S0": "2025-09-30T22:00:00.000Z",
+    "Hg4qvETuwYK": "258841234568",
+    "V8tONkNtxoU": "Mathumbo",
+    "zLCZavzzwCI": "2015-03-12",
+    "oJikYyD7QI3": 10,
+    "zDEioT7Mqom": "XVij3NI2rNc",
+    "L5DmlpeqfUO": "Pai",
+    "coFfWIjsmyL": "45",
+    "xLwP20c9HCi": true,
+    "a8GQzSXuCH7": "Domingos",
+    "pOBRfW2zIik": 32,
+    "UroKeEZ7tDo": "10-14",
+    "j1eDZwOXxmw": "Idoso",
+    "ZKMpizzJhdf": "Criança HIV+",
+    "QZWrwRQ0CRe": "Feminino",
+    "ntogDt6vKk5": true,
+    "VebelM3dJDm": "Fonseca Domingos",
+    "q3SO21JQyrX": "Filho/a",
+    "LQyrIUUAjV5": "HIV+ em TARV",
+    "vhs3LUN9VRm": "3ª Classe",
+    "ChfQ3E2srJj": "Criança",
+    "dGsuAVmPwv7": "Paulo Filipe Ngajande",
+    "MxgJxkbO96F": "Perto da Igreja ADAMS",
+    "XDAcwQUv1YV": "Unidade sanitária",
+    "PRdRQTJKgnZ": "100",
+    "mukSzNM7Mc0": "Mãe",
+    "hXpyioqAugh": "SLX067"
+  },
+  "enrollmentData": {
+    "enrolledAt": "2026-03-04T22:00:00.000Z",
+    "occurredAt": "2026-03-04T22:00:00.000Z",
+    "enrollmentId": "ZLex691kE3r"
+  }
+}
+
+2.{
+  "kTlOBhNLCob": null,
+  "SEOfOdzUXyb": null,
+  "oqOuG5HoU4D": null,
+  "aVLHY5LsVdz": null,
+  "g0CdZ7yJ2c4": null,
+  "T6bAUUVR519": null,
+  "xQfbC69RK0x": null,
+  "hxCtVXmE45q": "45",
+  "YQP5RCNEHK3": null,
+  "TiPCcD1nj1w": true,
+  "Z7kjEEFlxHo": "2025-09-30T22:00:00.000Z",
+  "viSiTXdsmdD": null,
+  "sh8tmEJ0ltI": null,
+  "KYrv2z2ufld": null,
+  "jUGl8pN4ZpW": null,
+  "hRGSBH2Y3zO": null,
+  "ukaBixeKHHK": "Inactivo",
+  "vq17kaKVJHk": null,
+  "Ulz5o1PZ8Xl": null,
+  "jm7QbNUrQnJ": "2015-03-12",
+  "gsn9xrvic9k": 4,
+  "khmBaMC1qeT": "<1",
+  "EUFTZItOWmA": 1,
+  "mv7CBi3vNN9": "HIV+ e em TARV",
+  "kuHACzCafT4": "Sim"
+}
+
+3.{
+  "orgUnit": {
+    "id": "XVij3NI2rNc",
+    "name": "ORG UNIT TEST2",
+    "path": "/YR6uvRWHYkG/XVij3NI2rNc"
+  }
+}
+
+4. {
+  "id": "XVij3NI2rNc",
+  "name": "ORG UNIT TEST2",
+  "code": "ORG UNIT TEST2",
+  "path": "/YR6uvRWHYkG/XVij3NI2rNc",
+  "groups": []
+}

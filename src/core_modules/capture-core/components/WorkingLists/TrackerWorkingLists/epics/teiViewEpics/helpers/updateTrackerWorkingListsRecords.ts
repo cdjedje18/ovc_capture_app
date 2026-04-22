@@ -9,6 +9,7 @@ import {
     buildFilterQueryArgs,
 } from '../../../../WorkingListsCommon';
 import type { Input } from './updateTrackerWorkingListsRecords.types';
+import { isMembersFormPage as isMembersFormPageRoute } from '../../../../utils/isMembersFormPage';
 
 export const updateTrackerWorkingListsRecords = ({
     page,
@@ -33,9 +34,11 @@ export const updateTrackerWorkingListsRecords = ({
     const rawQueryArgs
     = { programId, orgUnitId, pageSize, page, filters, sortById, sortByDirection };
     const params = { columnsMetaForDataFetching, filtersOnlyMetaForDataFetching, querySingleResource, absoluteApiPath };
-    const promiseToUpdateRecordsList = programStageId
+    const isMembersFormPage = isMembersFormPageRoute();
+    const shouldUseEventList = !!programStageId && !isMembersFormPage;
+    const promiseToUpdateRecordsList = shouldUseEventList
         ? getEventListData({ ...rawQueryArgs, programStageId }, params)
-        : getTeiListData(rawQueryArgs, params);
+        : getTeiListData({ ...rawQueryArgs, programStageId }, params);
 
     return promiseToUpdateRecordsList
         .then(({ recordContainers, request }) => updateListSuccess(storeId, {

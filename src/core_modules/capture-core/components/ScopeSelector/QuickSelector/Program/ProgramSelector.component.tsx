@@ -11,6 +11,15 @@ import { EmptyPrograms } from './EmptyPrograms';
 import { ProgramList } from './ProgramList';
 import { getOptions } from './getOptions';
 import { OptionLabel } from '../../OptionLabel';
+import { useDataQuery } from '@dhis2/app-runtime';
+import { isMembersFormPage as isMembersFormPageRoute } from '../../../WorkingLists/utils/isMembersFormPage';
+
+
+const dataStoreQuery = {
+    results: {
+        resource: 'dataStore/ovc_capture_app/programs',
+    },
+};
 
 const styles = () => ({
     selectBarMenu: {
@@ -32,6 +41,19 @@ type OwnProps = {
     formIsOpen: boolean;
 };
 
+
+type MasterProgram = {
+    id: string;
+    name: string;
+    description?: string;
+};
+
+type Params = {
+    results?: {
+        masterPrograms?: MasterProgram[];
+    };
+};
+
 type Props = OwnProps & WithStyles<typeof styles>;
 
 const ProgramSelectorPlain = ({
@@ -50,10 +72,31 @@ const ProgramSelectorPlain = ({
     const [programsArray, setProgramsArray] = useState<Array<Program>>([]);
     const selectedProgram = selectedProgramId ? programCollection.get(selectedProgramId) : null;
     const programOptions = getOptions(programsArray, selectedOrgUnitId);
-    const isMenuDisabled = !handleClickProgram;
+    const isMembersFormPage = isMembersFormPageRoute();
+    const isMenuDisabled = !handleClickProgram || isMembersFormPage;
+
+    const programsDataStoreQuery = useDataQuery(dataStoreQuery, {
+        lazy: true,
+        onComplete(params) {
+            // console.log({ params })
+            const masterPrograms = (params as Params)?.results?.masterPrograms;
+            const masterProgramsCollection = new Map(masterPrograms?.map(item => [item.id, item]));
+            // console.log(masterProgramsCollection)
+            const programs = Array.from(programCollection.values());
+            const displayedProgramas = programs.filter(item =>
+                masterProgramsCollection.has(item._id),
+            );
+            // console.log(displayedProgramas)
+            setProgramsArray(displayedProgramas);
+        },
+    });
 
     useEffect(() => {
-        setProgramsArray(Array.from(programCollection.values()));
+        // setProgramsArray(Array.from(programCollection.values()));
+
+        if (!selectedProgramId) {
+            programsDataStoreQuery.refetch();
+        }
     }, []);
 
     const renderCategories = () => {
@@ -70,12 +113,13 @@ const ProgramSelectorPlain = ({
                     onSelect={option => handleSetCatergoryCombo && handleSetCatergoryCombo(option, category.id)}
                     onClearSelectionClick={() => onResetCategoryOption(category.id)}
                     selectedOrgUnitId={selectedOrgUnitId}
-                    displayOnly={formIsOpen}
+                    displayOnly={formIsOpen || isMenuDisabled}
                 />
             ));
         }
         return null;
     };
+
 
     return (
         <>
@@ -86,7 +130,7 @@ const ProgramSelectorPlain = ({
                 open={open}
                 setOpen={openSelectorBarItem => (isMenuDisabled ? null : setOpen(openSelectorBarItem))}
                 displayOnly={isMenuDisabled}
-                onClearSelectionClick={() => onResetProgramId(resetProgramIdBase())}
+                onClearSelectionClick={!isMenuDisabled ? () => onResetProgramId(resetProgramIdBase()) : undefined}
                 dataTest="program-selector-container"
             >
                 <div className={classes.selectBarMenu}>

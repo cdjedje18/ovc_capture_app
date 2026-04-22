@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { isEqual } from 'lodash';
 import { Modal, ModalTitle, ModalContent, ModalActions, Button } from '@dhis2/ui';
 import i18n from '@dhis2/d2-i18n';
@@ -16,6 +16,10 @@ type Props = {
 
 export const ColumnSelectorDialog = ({ columns, open, onClose, onSave }: Props) => {
     const [columnList, setColumnList] = useState(columns);
+    const selectableColumnList = useMemo(
+        () => columnList.filter(column => !column.hideInColumnSelector),
+        [columnList],
+    );
 
     useEffect(() => {
         setColumnList(currentColumns => (isEqual(columns, currentColumns) ? currentColumns : columns));
@@ -34,7 +38,16 @@ export const ColumnSelectorDialog = ({ columns, open, onClose, onSave }: Props) 
     };
 
     const handleUpdateListOrder = (sortedList: Columns) => {
-        setColumnList(sortedList);
+        let nextVisibleIndex = 0;
+        setColumnList(currentColumns => currentColumns.map((column) => {
+            if (column.hideInColumnSelector) {
+                return column;
+            }
+
+            const nextColumn = sortedList[nextVisibleIndex];
+            nextVisibleIndex += 1;
+            return nextColumn || column;
+        }));
     };
 
     if (!open) {
@@ -51,7 +64,7 @@ export const ColumnSelectorDialog = ({ columns, open, onClose, onSave }: Props) 
                 <ModalTitle>{i18n.t('Columns to show in table')}</ModalTitle>
                 <ModalContent>
                     <DragDropList
-                        listItems={columnList}
+                        listItems={selectableColumnList}
                         handleUpdateListOrder={handleUpdateListOrder}
                         handleToggle={handleToggle}
                     />

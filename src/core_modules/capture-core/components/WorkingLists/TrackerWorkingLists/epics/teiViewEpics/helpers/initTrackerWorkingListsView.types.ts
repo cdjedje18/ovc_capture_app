@@ -7,6 +7,7 @@ import type { QuerySingleResource } from '../../../../../../utils/api';
 
 export type Input = {
     programId: string,
+    programStageId?: string,
     orgUnitId: string,
     storeId: string,
     selectedTemplate: TrackerWorkingListsTemplate,

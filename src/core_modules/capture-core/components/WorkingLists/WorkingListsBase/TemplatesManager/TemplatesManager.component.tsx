@@ -44,6 +44,7 @@ const TemplatesManagerPlain = (props: Props) => {
             {
                 currentListIsModified => (
                     <TemplateSelector
+                        programId={passOnProps.programId}
                         templates={templates}
                         currentTemplateId={currentTemplate.id}
                         currentListIsModified={currentListIsModified}

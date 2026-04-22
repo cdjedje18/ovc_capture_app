@@ -1,6 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { Props } from './trackerWorkingListsSetup.types';
 import { WorkingListsBase } from '../../WorkingListsBase';
+import { useMainViewConfig } from 'capture-core/components/Pages/MembersFormPage/MembersFormPageBody/WorkingListsType/EventWorkingListsInit/InitOnline/useMainViewConfig';
+import { useSelectedMembersSection, setSelectedMembersSection } from '../../WorkingListsBase/membersSectionSelection.store';
+import { useLoadingSelectedDateEvents } from '../../WorkingListsBase/membersVisitDate.store';
 import {
     useDefaultColumnConfig,
     useFiltersOnly,
@@ -12,6 +15,7 @@ import {
 import { useColumns, useDataSource, useViewHasTemplateChanges } from '../../WorkingListsCommon';
 import type { TrackerWorkingListsColumnConfigs } from '../types';
 import { buildArgumentsForTemplate } from '../helpers';
+import { isMembersFormPage as isMembersFormPageRoute } from '../../utils/isMembersFormPage';
 
 const DEFAULT_TEMPLATES_LENGTH = 1;
 
@@ -35,7 +39,7 @@ const shouldPreserveViewState = ({
 
 const useCurrentTemplate = (templates: any[], currentTemplateId?: string) => useMemo(() =>
     (currentTemplateId && templates.find(template => template.id === currentTemplateId)) || templates[0],
-[templates, currentTemplateId]);
+    [templates, currentTemplateId]);
 
 export const TrackerWorkingListsSetup = ({
     program,
@@ -64,17 +68,66 @@ export const TrackerWorkingListsSetup = ({
     bulkActionBarComponent,
     ...passOnProps
 }: Props) => {
-    const prevProgramStageId = useRef(programStageId);
+    const isMembersFormPage = isMembersFormPageRoute();
+    const { dataEntryPrograms } = useMainViewConfig();
+    const loadingSelectedDateEvents = useLoadingSelectedDateEvents();
+    const dataEntryProgramStageId = useMemo(() => {
+        const selectedDataEntryProgram =
+            dataEntryPrograms?.find(entry => entry.program === program.id) ?? dataEntryPrograms?.[0];
+
+        return selectedDataEntryProgram?.programStage;
+    }, [dataEntryPrograms, program.id]);
+    const effectiveProgramStageId =
+        isMembersFormPage ? (dataEntryProgramStageId || programStageId) : programStageId;
+    const listQueryProgramStageId = effectiveProgramStageId;
+    const selectedMembersSectionId = useSelectedMembersSection(effectiveProgramStageId);
+    const defaultSectionId = useMemo(() => {
+        if (!effectiveProgramStageId) {
+            return undefined;
+        }
+        const programStage = program.stages.get(effectiveProgramStageId);
+        if (!programStage) {
+            return undefined;
+        }
+        return Array.from(programStage.stageForm.sections.values())
+            .find(section => section.visible && section.name)?.id;
+    }, [effectiveProgramStageId, program.stages]);
+    const selectedSectionIdForColumns = isMembersFormPage
+        ? (selectedMembersSectionId || defaultSectionId)
+        : undefined;
+    const prevProgramStageId = useRef(effectiveProgramStageId);
     const prevTemplateId = useRef(currentTemplateId);
-    const defaultColumns = useDefaultColumnConfig(program, orgUnitId, programStageId);
-    const columns = useColumns<TrackerWorkingListsColumnConfigs>(customColumnOrder, defaultColumns);
-    const filtersOnly = useFiltersOnly(program, programStageId);
-    const programStageFiltersOnly = useProgramStageFilters(program, programStageId);
+    const defaultColumns = useDefaultColumnConfig(program, orgUnitId, effectiveProgramStageId, selectedSectionIdForColumns);
+    let elementsWithSections: any = []
+    const dataFetchingColumns = useDefaultColumnConfig(
+        program,
+        orgUnitId,
+        effectiveProgramStageId,
+        isMembersFormPage ? undefined : selectedSectionIdForColumns,
+    );
+    program.stages.forEach(x => {
+        if (x._id === dataEntryProgramStageId) {
+            x._stageForm.sections.forEach(x => x.elements.forEach((ele: any) => elementsWithSections.push({ name: ele._name, id: ele._id, section: x._id })))
+        }
+    })
+    const columns = useColumns<TrackerWorkingListsColumnConfigs>(customColumnOrder, defaultColumns, elementsWithSections);
+
+    const baseFiltersOnly = useFiltersOnly(program, effectiveProgramStageId);
+    const baseProgramStageFiltersOnly = useProgramStageFilters(program, effectiveProgramStageId);
+    const filtersOnly = useMemo(
+        () => (isMembersFormPage ? [] : baseFiltersOnly),
+        [isMembersFormPage, baseFiltersOnly],
+    );
+    const programStageFiltersOnly = useMemo(
+        () => (isMembersFormPage ? [] : baseProgramStageFiltersOnly),
+        [isMembersFormPage, baseProgramStageFiltersOnly],
+    );
     const staticTemplates = useStaticTemplates(
         storedTemplates?.find(storedTemplate => storedTemplate.isDefault && storedTemplate.isAltered),
         `${program.id}-default`,
     );
     const templates = apiTemplates?.length > DEFAULT_TEMPLATES_LENGTH ? apiTemplates : staticTemplates;
+    const currentTemplate = useCurrentTemplate(templates, currentTemplateId);
     const viewHasChanges = useViewHasTemplateChanges({
         initialViewConfig,
         defaultColumns,
@@ -84,9 +137,64 @@ export const TrackerWorkingListsSetup = ({
         sortByDirection,
         isDefaultTemplateAltered: storedTemplates?.find(template => template.isDefault)?.isAltered,
     });
+    const membersDataReadyTrigger = useMemo(() => {
+        if (!isMembersFormPage) {
+            return customUpdateTrigger;
+        }
+
+        const dataFetchingColumnIds = dataFetchingColumns.map(column => column.id).join(',');
+        return [
+            customUpdateTrigger || '',
+            effectiveProgramStageId || '',
+            dataFetchingColumnIds,
+        ].join('::');
+    }, [customUpdateTrigger, dataFetchingColumns, effectiveProgramStageId, isMembersFormPage]);
+
+    const buildTemplateArgs = useCallback(() => buildArgumentsForTemplate({
+        filters,
+        filtersOnly,
+        programStageFiltersOnly,
+        columns,
+        sortById,
+        sortByDirection,
+        programId: program.id,
+        programStageId: listQueryProgramStageId,
+    }), [
+        filters,
+        filtersOnly,
+        programStageFiltersOnly,
+        columns,
+        sortById,
+        sortByDirection,
+        program.id,
+        listQueryProgramStageId,
+    ]);
 
     useEffect(() => {
-        const viewHasProgramStageChanges = viewHasChanges && programStageId !== prevProgramStageId.current;
+        if (!isMembersFormPage || !effectiveProgramStageId) {
+            return;
+        }
+
+        const programStage = program.stages.get(effectiveProgramStageId);
+        if (!programStage) {
+            return;
+        }
+
+        const visibleSections = Array.from(programStage.stageForm.sections.values())
+            .filter(section => section.visible && section.name);
+        if (!visibleSections.length) {
+            return;
+        }
+
+        const isSelectedSectionValid = selectedMembersSectionId &&
+            visibleSections.some(section => section.id === selectedMembersSectionId);
+        if (!isSelectedSectionValid) {
+            setSelectedMembersSection(effectiveProgramStageId, visibleSections[0].id);
+        }
+    }, [isMembersFormPage, effectiveProgramStageId, program.stages, selectedMembersSectionId]);
+
+    useEffect(() => {
+        const viewHasProgramStageChanges = viewHasChanges && effectiveProgramStageId !== prevProgramStageId.current;
 
         if (viewHasProgramStageChanges) {
             onResetListColumnOrder && onResetListColumnOrder();
@@ -95,29 +203,20 @@ export const TrackerWorkingListsSetup = ({
                 shouldPreserveViewState({
                     currentTemplateId,
                     defaultTemplateId,
-                    programStageId,
+                    programStageId: listQueryProgramStageId,
                     prevProgramStageId,
                     prevTemplateId,
                 })
             ) {
-                const { criteria } = buildArgumentsForTemplate({
-                    filters,
-                    filtersOnly,
-                    programStageFiltersOnly,
-                    columns,
-                    sortById,
-                    sortByDirection,
-                    programId: program.id,
-                    programStageId,
-                });
+                const { criteria } = buildTemplateArgs();
 
                 onPreserveCurrentViewState(defaultTemplateId, criteria);
             }
         }
         prevTemplateId.current = currentTemplateId;
-        prevProgramStageId.current = programStageId;
+        prevProgramStageId.current = effectiveProgramStageId;
     }, [
-        programStageId,
+        effectiveProgramStageId,
         onResetListColumnOrder,
         viewHasChanges,
         program,
@@ -128,75 +227,61 @@ export const TrackerWorkingListsSetup = ({
         columns,
         sortById,
         sortByDirection,
+        listQueryProgramStageId,
         currentTemplateId,
         prevTemplateId,
+        buildTemplateArgs,
     ]);
 
     const injectArgumentsForAddTemplate = useCallback(
         (name: string) => {
-            const { criteria, data } = buildArgumentsForTemplate({
-                filters,
-                filtersOnly,
-                programStageFiltersOnly,
-                columns,
-                sortById,
-                sortByDirection,
-                programId: program.id,
-                programStageId,
-            });
+            const { criteria, data } = buildTemplateArgs();
             onAddTemplate(name, criteria, data);
         },
         [
             onAddTemplate,
-            filters,
-            filtersOnly,
-            programStageFiltersOnly,
-            columns,
-            sortById,
-            sortByDirection,
-            program.id,
-            programStageId,
+            buildTemplateArgs,
         ],
     );
 
     const injectArgumentsForUpdateTemplate = useCallback(
         (template: any) => {
-            const { criteria, data } = buildArgumentsForTemplate({
-                filters,
-                filtersOnly,
-                programStageFiltersOnly,
-                columns,
-                sortById,
-                sortByDirection,
-                programId: program.id,
-                programStageId,
-            });
+            const { criteria, data } = buildTemplateArgs();
             onUpdateTemplate(template, criteria, data);
         },
         [
             onUpdateTemplate,
-            filters,
-            filtersOnly,
-            programStageFiltersOnly,
-            columns,
-            sortById,
-            sortByDirection,
-            program.id,
-            programStageId,
+            buildTemplateArgs,
         ],
     );
 
     const injectArgumentsForDeleteTemplate = useCallback(
-        (template: any) => onDeleteTemplate(template, program.id, programStageId),
-        [onDeleteTemplate, program.id, programStageId],
+        (template: any) => onDeleteTemplate(template, program.id, listQueryProgramStageId),
+        [onDeleteTemplate, program.id, listQueryProgramStageId],
     );
+
+    const { listData: dataSource } = useDataSource(records, recordsOrder, columns, effectiveProgramStageId);
+
+    const onLoadViewWithMeta = useInjectDataFetchingMetaToLoadList(
+        dataFetchingColumns,
+        filtersOnly,
+        programStageFiltersOnly,
+        onLoadView,
+    );
+    const onUpdateListWithMeta = useInjectDataFetchingMetaToUpdateList(
+        dataFetchingColumns,
+        filtersOnly,
+        programStageFiltersOnly,
+        onUpdateList,
+    );
+    const onRowClickNoop = useCallback(() => { }, []);
 
     return (
         <WorkingListsBase
             {...passOnProps}
             forceUpdateOnMount={forceUpdateOnMount}
-            currentTemplate={useCurrentTemplate(templates, currentTemplateId)}
-            customUpdateTrigger={customUpdateTrigger}
+            currentTemplate={currentTemplate}
+            customUpdateTrigger={membersDataReadyTrigger}
             templates={templates}
             columns={columns}
             onAddTemplate={injectArgumentsForAddTemplate}
@@ -204,28 +289,20 @@ export const TrackerWorkingListsSetup = ({
             onDeleteTemplate={injectArgumentsForDeleteTemplate}
             filtersOnly={filtersOnly}
             additionalFilters={programStageFiltersOnly}
-            dataSource={useDataSource(records, recordsOrder, columns)}
-            onLoadView={useInjectDataFetchingMetaToLoadList(
-                defaultColumns,
-                filtersOnly,
-                programStageFiltersOnly,
-                onLoadView,
-            )}
-            onUpdateList={useInjectDataFetchingMetaToUpdateList(
-                defaultColumns,
-                filtersOnly,
-                programStageFiltersOnly,
-                onUpdateList,
-            )}
+            dataSource={dataSource}
+            onLoadView={onLoadViewWithMeta}
+            onUpdateList={onUpdateListWithMeta}
             programId={program.id}
-            programStageId={programStageId}
+            programStageId={listQueryProgramStageId}
             rowIdKey="id"
             orgUnitId={orgUnitId}
             currentViewHasTemplateChanges={viewHasChanges}
             filters={filters}
             sortById={sortById}
             sortByDirection={sortByDirection}
+            updating={passOnProps.updating || loadingSelectedDateEvents}
             bulkActionBarComponent={bulkActionBarComponent}
+            onClickListRow={isMembersFormPage ? onRowClickNoop : passOnProps.onClickListRow}
         />
     );
 };

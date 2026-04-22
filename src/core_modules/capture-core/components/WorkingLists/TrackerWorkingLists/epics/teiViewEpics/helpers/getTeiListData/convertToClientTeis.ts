@@ -2,6 +2,13 @@ import { convertServerToClient } from '../../../../../../../converters';
 import type { ApiTeis, ApiTeiAttributes, TeiColumnsMetaForDataFetchingArray, ClientTeis } from './types';
 import { RECORD_TYPE, buildUrlByElementType } from '../getListDataCommon';
 
+const RECORD_META_KEYS = {
+    enrollmentId: '__enrollmentId',
+    orgUnitId: '__orgUnitId',
+    teiId: '__teiId',
+    programId: '__programId',
+} as const;
+
 const getValuesById = (attributeValues: ApiTeiAttributes = []) =>
     attributeValues
         .reduce((acc, { attribute, value }) => {
@@ -49,9 +56,23 @@ export const convertToClientTeis = (
                     return acc;
                 }, {});
 
+            const enrollment = (tei.enrollments || []).find(({ program }) => program === programId)
+                || tei.enrollments?.[0];
+            if (enrollment?.enrollment) {
+                record[RECORD_META_KEYS.enrollmentId] = enrollment.enrollment;
+            }
+            if (enrollment?.orgUnit) {
+                record[RECORD_META_KEYS.orgUnitId] = enrollment.orgUnit;
+            }
+            record[RECORD_META_KEYS.teiId] = tei.trackedEntity;
+            record[RECORD_META_KEYS.programId] = programId;
+
             const programOwner = tei.programOwners.find(({ program }) => program === programId)?.orgUnit;
             if (programOwner) {
                 record.programOwnerId = programOwner;
+                if (!record[RECORD_META_KEYS.orgUnitId]) {
+                    record[RECORD_META_KEYS.orgUnitId] = programOwner;
+                }
             }
 
             return {

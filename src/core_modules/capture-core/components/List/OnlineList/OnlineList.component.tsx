@@ -14,6 +14,9 @@ import { withStyles, type WithStyles } from 'capture-core-utils/styles';
 import type { ReactNode } from 'react';
 import type { OptionSet } from '../../../metaData';
 import { dataElementTypes } from '../../../metaData';
+import { withRouter, RouteComponentProps } from 'react-router-dom';
+import { buildUrlQueryString } from 'capture-core/utils/routing';
+import { withApiUtils } from '../../../HOC';
 
 const getStyles: Readonly<any> = {
     tableContainer: {
@@ -57,9 +60,109 @@ type Props = {
     getCustomEndCellBody?: (row: any, props: Props) => ReactNode;
     customEndCellHeaderStyle?: any;
     customEndCellBodyStyle?: any;
+    querySingleResource: (query: { resource: string; params?: Record<string, any> }) => Promise<any>;
 } & WithStyles<typeof getStyles>;
 
-class Index extends React.Component<Props> {
+const MEMBERS_FORM_PATH = '/membersForm';
+
+class Index extends React.Component<Props & RouteComponentProps> {
+    static membersEntryProgramId?: string;
+    static membersEntryProgramIdPromise?: Promise<string | undefined>;
+    static relationshipTypeByProgramId?: Record<string, string>;
+    static relationshipTypeByProgramIdPromise?: Promise<Record<string, string>>;
+
+    componentDidMount() {
+        if (!this.isMembersFormPage()) {
+            void Promise.all([
+                this.getMembersEntryProgramId(),
+                this.getRelationshipTypeByProgramId(),
+            ]);
+        }
+    }
+
+    isMembersFormPage = () => this.props.location.pathname.includes(MEMBERS_FORM_PATH);
+
+    getMembersEntryProgramId = async (): Promise<string | undefined> => {
+        if (Index.membersEntryProgramId) {
+            return Index.membersEntryProgramId;
+        }
+
+        if (Index.membersEntryProgramIdPromise) {
+            return Index.membersEntryProgramIdPromise;
+        }
+
+        Index.membersEntryProgramIdPromise = this.props.querySingleResource({
+            resource: 'dataStore/ovc_capture_app/data_entry',
+        }).then((dataEntryResponse) => {
+            const programs = Array.isArray(dataEntryResponse?.programs) ? dataEntryResponse.programs : [];
+            const membersEntryProgramId = programs.find((entry: any) => typeof entry?.program === 'string' && entry.program)?.program;
+
+            Index.membersEntryProgramId = membersEntryProgramId;
+            return membersEntryProgramId;
+        }).finally(() => {
+            Index.membersEntryProgramIdPromise = undefined;
+        });
+
+        return Index.membersEntryProgramIdPromise;
+    };
+
+    getRelationshipTypeByProgramId = async (): Promise<Record<string, string>> => {
+        if (Index.relationshipTypeByProgramId) {
+            return Index.relationshipTypeByProgramId;
+        }
+
+        if (Index.relationshipTypeByProgramIdPromise) {
+            return Index.relationshipTypeByProgramIdPromise;
+        }
+
+        Index.relationshipTypeByProgramIdPromise = this.props.querySingleResource({
+            resource: 'dataStore/ovc_capture_app/programs',
+        }).then((programsResponse) => {
+            const masterPrograms = Array.isArray(programsResponse?.masterPrograms) ? programsResponse.masterPrograms : [];
+            const relationshipTypeByProgramId = masterPrograms.reduce((acc: Record<string, string>, entry: any) => {
+                if (typeof entry?.id === 'string' && typeof entry?.relationshipType === 'string') {
+                    acc[entry.id] = entry.relationshipType;
+                }
+
+                return acc;
+            }, {});
+
+            Index.relationshipTypeByProgramId = relationshipTypeByProgramId;
+            return relationshipTypeByProgramId;
+        }).finally(() => {
+            Index.relationshipTypeByProgramIdPromise = undefined;
+        });
+
+        return Index.relationshipTypeByProgramIdPromise;
+    };
+
+    myOnClickListRow = async (row: any) => {
+        const query = this.props.location.search;
+        const params = Object.fromEntries(new URLSearchParams(query));
+        const currentProgramId = typeof params.programId === 'string' ? params.programId : undefined;
+
+        let membersEntryProgramId: string | undefined;
+        let relationshipTypeByProgramId: Record<string, string> = {};
+        try {
+            [membersEntryProgramId, relationshipTypeByProgramId] = await Promise.all([
+                this.getMembersEntryProgramId(),
+                this.getRelationshipTypeByProgramId(),
+            ]);
+        } catch {
+            membersEntryProgramId = undefined;
+            relationshipTypeByProgramId = {};
+        }
+
+        this.props.history.push(`${MEMBERS_FORM_PATH}?${buildUrlQueryString({
+            ...params,
+            masterTEI: row.id,
+            ...(currentProgramId && relationshipTypeByProgramId[currentProgramId]
+                ? { relationshipType: relationshipTypeByProgramId[currentProgramId] }
+                : {}),
+            ...(membersEntryProgramId ? { entryProgram: membersEntryProgramId } : {}),
+        })}`);
+    }
+
     getSortHandler =
         (id: string) =>
             ({ direction }: { direction: string }) => {
@@ -170,7 +273,11 @@ class Index extends React.Component<Props> {
                             onRowSelect(row[rowIdKey]);
                             return;
                         }
-                        this.props.onRowClick(row);
+                        if (this.isMembersFormPage()) {
+                            this.props.onRowClick(row);
+                            return;
+                        }
+                        this.myOnClickListRow(row);
                     }}
                 >
                     {row[column.id]}
@@ -216,4 +323,5 @@ class Index extends React.Component<Props> {
     }
 }
 
-export const OnlineList = withStyles(getStyles as any)(Index);
+const OnlineListBase = withStyles(getStyles as any)(withRouter(Index));
+export const OnlineList = withApiUtils(OnlineListBase);

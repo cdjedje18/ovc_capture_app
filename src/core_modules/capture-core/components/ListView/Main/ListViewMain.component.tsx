@@ -118,7 +118,6 @@ class ListViewMainPlain extends React.PureComponent<Props & WithStyles<typeof ge
         return (
             <ListComponent
                 {...passOnProps}
-                showSelectCheckBox
                 isSelectionInProgress={isSelectionInProgress}
                 customRowMenuContents={customRowMenuContents}
                 customTopBarActions={customTopBarActions}

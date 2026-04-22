@@ -10,9 +10,11 @@ import {
 } from '../../../../WorkingListsCommon';
 import type { Input } from './initTrackerWorkingListsView.types';
 import { convertToClientConfig } from '../../../helpers/TEIFilters';
+import { isMembersFormPage as isMembersFormPageRoute } from '../../../../utils/isMembersFormPage';
 
 export const initTrackerWorkingListsViewAsync = async ({
     programId,
+    programStageId: contextProgramStageId,
     orgUnitId,
     storeId,
     selectedTemplate,
@@ -44,10 +46,12 @@ export const initTrackerWorkingListsViewAsync = async ({
         filters: apiFilters,
     };
     const params = { columnsMetaForDataFetching, filtersOnlyMetaForDataFetching, querySingleResource, absoluteApiPath };
-    const programStageId = selectedTemplate?.criteria?.programStage;
-    const promiseToGetRecordsList = programStageId
+    const programStageId = selectedTemplate?.criteria?.programStage || contextProgramStageId;
+    const isMembersFormPage = isMembersFormPageRoute();
+    const shouldUseEventList = !!programStageId && !isMembersFormPage;
+    const promiseToGetRecordsList = shouldUseEventList
         ? getEventListData({ ...rawQueryArgs, programStageId }, params)
-        : getTeiListData(rawQueryArgs, params);
+        : getTeiListData({ ...rawQueryArgs, programStageId }, params);
 
     return promiseToGetRecordsList
         .then(({ recordContainers, request }) =>

@@ -844,7 +844,7 @@ msgstr ""
 msgid "Please select a valid combination."
 msgstr "Selecciona una combinación válida"
 
-msgid "Get started with Capture app"
+msgid "Get started with OVC Capture App"
 msgstr "Comience a utilizar la aplicación de Captura de datos"
 
 msgid "Report data"
@@ -2338,3 +2338,4 @@ msgid ""
 "restrictions. For better performance, use another browser or exit private "
 "mode if this is currently in use."
 msgstr ""
+

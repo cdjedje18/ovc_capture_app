@@ -1,56 +1,62 @@
 import * as React from 'react';
-import { withStyles } from 'capture-core-utils/styles';
+import { CalendarInput, IconCalendar16, colors } from '@dhis2/ui';
 import i18n from '@dhis2/d2-i18n';
+import { withStyles } from 'capture-core-utils/styles';
 import type { WithStyles } from 'capture-core-utils/styles';
-
-import { localeCompareStrings } from '../../../utils/localeCompareStrings';
-import { TemplateSelectorChip } from './TemplateSelectorChip.component';
-import { CaptureScrollHeight } from './CaptureScrollHeight.component';
-import { LinkButton } from '../../Buttons/LinkButton.component';
+import { programCollection, systemSettingsStore } from 'capture-core/metaDataMemoryStores';
+import { useMainViewConfig } from
+    'capture-core/components/Pages/MembersFormPage/MembersFormPageBody/WorkingListsType/EventWorkingListsInit/InitOnline/useMainViewConfig'; // eslint-disable-line max-len
 import type { WorkingListTemplates } from './workingListsBase.types';
+import { TableHeaderTabsSelector } from './TableHeaderTabsSelector.component';
+import { setSelectedMembersVisitDate, useSelectedMembersVisitDate } from './membersVisitDate.store';
+import useShowAlerts from 'capture-core/components/Pages/MembersFormPage/hooks/common/useShowAlert';
+import moment from 'moment';
 
 const getBorder = (theme: any) => {
     const color = theme.palette.dividerLighter;
     return `${theme.typography.pxToRem(1)} solid ${color}`;
 };
 
-const maxHeight = 110;
-
 const getStyles = (theme: any) => ({
     container: {
         borderBottom: getBorder(theme),
     },
-    configsContainer: {
+    controlsContainer: {
+        display: 'grid',
+        gridTemplateColumns: 'repeat(12, minmax(0, 1fr))',
+        alignItems: 'end',
+        columnGap: theme.typography.pxToRem(8),
+        width: '100%',
+    },
+    dateFieldContainer: {
+        padding: `${theme.typography.pxToRem(8)} ${theme.typography.pxToRem(8)} ${theme.typography.pxToRem(6)}`,
+        gridColumn: 'span 2',
+        width: '100%',
+        minWidth: 0,
+    },
+    dateFieldLabel: {
+        ...theme.typography.body1,
+        marginBottom: theme.typography.pxToRem(6),
         display: 'flex',
-        flexWrap: 'wrap',
-        padding: `${theme.typography.pxToRem(3)} 0rem`,
-        maxHeight,
-        overflow: 'hidden',
+        alignItems: 'center',
+        gap: theme.typography.pxToRem(4),
     },
-    configsContainerExpanded: {
-        display: 'flex',
-        flexWrap: 'wrap',
-        padding: `${theme.typography.pxToRem(3)} 0rem`,
+    tabsContainer: {
+        gridColumn: 'span 10',
+        minWidth: 0,
     },
-    chipContainer: {
-        padding: `${theme.typography.pxToRem(5)} ${theme.typography.pxToRem(8)}`,
+    titleContainer: {
+        padding: `${theme.typography.pxToRem(12)} ${theme.typography.pxToRem(12)} ${theme.typography.pxToRem(10)}`,
     },
-    linkButtonContainer: {
-        marginBottom: 5,
-        display: 'flex',
-        justifyContent: 'center',
-    },
-    linkButton: {
-        fontSize: 10,
-        backgroundColor: 'transparent',
-        '&:focus': {
-            outline: 'none',
-            fontWeight: 500,
-        },
+    title: {
+        ...theme.typography.subtitle1,
+        fontWeight: 600,
+        margin: 0,
     },
 }) as const;
 
 type OwnProps = {
+    programId: string;
     templates: WorkingListTemplates;
     currentTemplateId: string;
     currentListIsModified: boolean;
@@ -60,92 +66,125 @@ type OwnProps = {
 
 type Props = OwnProps & WithStyles<typeof getStyles>;
 
-const TemplateSelectorPlain = (props: Props) => {
-    const {
-        templates,
-        currentTemplateId,
-        currentListIsModified,
-        onSelectTemplate,
-        selectionInProgress,
-        classes,
-    } = props;
+const TemplateSelectorPlain = ({
+    classes,
+    programId,
+    templates,
+    currentTemplateId,
+    currentListIsModified,
+    onSelectTemplate,
+    selectionInProgress,
+}: Props) => {
+    const selectedDate = useSelectedMembersVisitDate();
+    const { dataEntryPrograms } = useMainViewConfig();
+    const isMembersFormPage =
+        typeof window !== 'undefined' && window.location.href.includes('/membersForm');
 
-    const containerEl = React.useRef<HTMLDivElement | null>(null);
-    const [isExpanded, setExpandedStatus] = React.useState(false);
+    // Keep these props "used" for lint since this component only renders custom header now.
+    const templateContextMarker = React.useMemo(
+        () => [
+            templates?.length || 0,
+            currentTemplateId || '',
+            String(currentListIsModified),
+            String(Boolean(onSelectTemplate)),
+            String(selectionInProgress),
+        ].join(':'),
+        [templates, currentTemplateId, currentListIsModified, onSelectTemplate, selectionInProgress],
+    );
 
-    const customTemplates = React.useMemo(() => templates
-        .filter(c => !c.isDefault)
-        .sort(({ order: orderA, name: nameA }, { order: orderB, name: nameB }) => {
-            let sortResult;
-            if (orderA && orderB) {
-                sortResult = orderA - orderB;
-            } else if (orderA) {
-                sortResult = 1;
-            } else if (orderB) {
-                sortResult = -1;
-            } else {
-                sortResult = localeCompareStrings(nameA, nameB);
-            }
-            return sortResult;
-        }), [templates]);
+    const selectedProgramName = React.useMemo(() => {
+        if (isMembersFormPage) {
+            return 'Formulário de Registo de Serviços';
+        }
 
-    const getHeightModifierButton = React.useCallback(() => (
-        <LinkButton
-            className={classes.linkButton}
-            onClick={() => { setExpandedStatus(!isExpanded); }}
-        >
-            {isExpanded ? i18n.t('Show Less') : i18n.t('Show All')}
-        </LinkButton>
-    ), [isExpanded, classes.linkButton]);
+        const selectedProgram = programCollection.get(programId);
+        return selectedProgram?.name || i18n.t('Lista de Familias');
+    }, [isMembersFormPage, programId]);
 
-    if (customTemplates.length <= 0) {
-        return null;
-    }
+    const systemSettings = systemSettingsStore.get();
+    const calendarType: any = systemSettings.calendar || 'gregory';
+    const format: any = systemSettings.dateFormat;
+    const locale = systemSettings.uiLocale;
+    const visitDateLabel = React.useMemo(() => {
+        if (!isMembersFormPage) {
+            return 'Data da visita:';
+        }
 
-    const configElements = customTemplates.map((customTemplate) => {
-        const { id } = customTemplate;
-        return (
-            <div
-                data-test="workinglist-template-selector-chip-container"
-                className={classes.chipContainer}
-                key={id}
-            >
-                <TemplateSelectorChip
-                    template={customTemplate}
-                    currentTemplateId={currentTemplateId}
-                    onSelectTemplate={onSelectTemplate}
-                    currentListIsModified={currentListIsModified}
-                    disabled={selectionInProgress}
-                />
-            </div>
-        );
-    });
+        const currentDataEntryProgram =
+            dataEntryPrograms?.find(entry => entry.program === programId) ?? dataEntryPrograms?.[0];
+        const currentProgram = programCollection.get(currentDataEntryProgram?.program || '');
+        const currentProgramStageId = currentDataEntryProgram?.programStage;
+        const currentProgramStage = currentProgramStageId ? currentProgram?.getStage(currentProgramStageId) : undefined;
+        const stageAny = currentProgramStage as any;
+
+        const labelFromStage =
+            stageAny?.executionDateLabel ||
+            stageAny?.displayExecutionDateLabel ||
+            currentProgramStage?.stageForm?.getLabel('occurredAt');
+
+        return labelFromStage ? `${labelFromStage}:` : 'Data da visita:';
+    }, [dataEntryPrograms, isMembersFormPage, programId]);
+    const { hide, show } = useShowAlerts()
+
+    const isDateInFuture = (dateString: string) => {
+        const normalized = moment(dateString, ['DD-MM-YYYY', 'YYYY-MM-DD'], true).format('YYYY-MM-DD');
+        const selectedDate = new Date(normalized);
+        const today = new Date();
+
+        today.setHours(0, 0, 0, 0);
+        selectedDate.setHours(0, 0, 0, 0)
+
+        return selectedDate > today;
+    };
+
+    const onDateSelect = React.useCallback(
+        (value: { calendarDateString: string } | null) => {
+            if (value?.calendarDateString)
+                if (!isDateInFuture(value?.calendarDateString!)) {
+                    setSelectedMembersVisitDate(value?.calendarDateString ?? undefined);
+                } else {
+                    show({
+                        message: `A data não pode ser maior que hoje`,
+                        type: { critical: true }
+                    });
+                    setTimeout(hide, 5000);
+                }
+        },
+        [],
+    );
 
     return (
         <div
             className={classes.container}
+            data-template-context={templateContextMarker}
         >
-            <CaptureScrollHeight
-                captureEl={containerEl}
-                extraTriggers={[templates]}
-            >
-                {height => (
-                    <React.Fragment>
-                        <div
-                            data-test="workinglists-template-selector-chips-container"
-                            ref={containerEl}
-                            className={!isExpanded ? classes.configsContainer : classes.configsContainerExpanded}
-                        >
-                            {configElements}
+            <div className={classes.titleContainer}>
+                <h3 className={classes.title}>{selectedProgramName}</h3>
+            </div>
+            {isMembersFormPage ? (
+                <div className={classes.controlsContainer}>
+                    <div
+                        data-test="workinglists-template-selector-date-container"
+                        className={classes.dateFieldContainer}
+                    >
+                        <div className={classes.dateFieldLabel}>
+                            <IconCalendar16 color={colors.grey700} />
+                            {visitDateLabel}
                         </div>
-                        <div
-                            className={classes.linkButtonContainer}
-                        >
-                            {height > maxHeight ? getHeightModifierButton() : null}
-                        </div>
-                    </React.Fragment>
-                )}
-            </CaptureScrollHeight>
+                        <CalendarInput
+                            label=""
+                            date={selectedDate?.original}
+                            calendar={calendarType}
+                            format={format}
+                            locale={locale}
+                            onDateSelect={onDateSelect}
+                        />
+                    </div>
+                    <div className={classes.tabsContainer}>
+                        <TableHeaderTabsSelector programId={programId} />
+                    </div>
+                </div>
+            ) : null}
         </div>
     );
 };

@@ -818,7 +818,7 @@ msgstr "Možnost kategorie není pro vybranou organizační jednotku platná."
 msgid "Please select a valid combination."
 msgstr "Vyberte platnou kombinaci."
 
-msgid "Get started with Capture app"
+msgid "Get started with OVC Capture App"
 msgstr "Začněte s aplikací Capture"
 
 msgid "Report data"
@@ -2305,3 +2305,4 @@ msgstr ""
 "Tato aplikace je v současné době spuštěna v režimu kompatibility z důvodu "
 "omezení prohlížeče. Pro lepší výkon použijte jiný prohlížeč nebo ukončete "
 "soukromý režim, pokud jej právě používáte."
+
