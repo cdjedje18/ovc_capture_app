@@ -20,6 +20,8 @@ type Props = {
         error?: boolean
         content?: string
     };
+    rowChangedRef: any
+    rowIndex: number
     value: any;
     onCommit: (value: any, handledByRule?: boolean) => void;
     disabled?: boolean;
@@ -104,6 +106,8 @@ export const InlineEventCellField = React.memo(({
     onCommit,
     disabled,
     saveStatus = 'idle',
+    rowChangedRef,
+    rowIndex
 }: Props) => {
     const [localValue, setLocalValue] = useState<any>(value ?? null);
 
@@ -130,6 +134,7 @@ export const InlineEventCellField = React.memo(({
         if (disabled) {
             return;
         }
+        rowChangedRef.current = rowIndex
         setLocalValue(nextValue);
         onCommit(nextValue);
     }, [onCommit, disabled]);
@@ -157,7 +162,7 @@ export const InlineEventCellField = React.memo(({
 
     const commonStyle = { minWidth: 180 };
     const showMessage = column.required && (!value && !localValue);
-    const statusNode =  (saveStatus !== 'idle' || showMessage || column?.error)
+    const statusNode = (saveStatus !== 'idle' || showMessage || column?.error)
         ? (
             <div
                 style={{

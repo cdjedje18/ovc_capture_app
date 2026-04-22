@@ -258,9 +258,15 @@ export const useDataSource = (
 
     // Mutable refs — never trigger re-renders, never go stale inside async callbacks
     const rowValueRef = useRef<Record<number, any>>({});
+    const rowChangedRef = useRef<number | null>(null);
 
     // FIX 1: Rules cache — avoids re-running expensive rules for unchanged rows.
     const rulesCacheRef = useRef<Map<string, any>>(new Map());
+
+    // Persists the last computed updatedColumns per row so that rows skipped by
+    // the rowChangedRef guard still render with their previous rule effects
+    // (hidden/disabled/required/value state) instead of falling back to raw columnsRef.
+    const updatedColumnsPerRowRef = useRef<Record<number, any[]>>({});
 
     // FIX 2: Stable callback refs — persistEventCellValue and recordOverride are
     // excluded from the buildRows useEffect dependency array; the refs always
@@ -361,6 +367,12 @@ export const useDataSource = (
         setLoadingSelectedDateEvents(Boolean(selectedMembersVisitDate?.normalized && selectedDateEventsLoading));
         return () => { setLoadingSelectedDateEvents(false); };
     }, [isMembersFormPage, selectedDateEventsLoading, selectedMembersVisitDate?.normalized]);
+
+    useEffect(() => {
+        rulesCacheRef.current.clear();
+        rowValueRef.current = {};
+        updatedColumnsPerRowRef.current = {}; // ← add this line
+    }, [selectedMembersVisitDate?.normalized]);
 
     useEffect(() => {
         if (!isMembersFormPage || !selectedMembersVisitDate?.normalized || !recordsOrder?.length || !records) return;
@@ -596,9 +608,9 @@ export const useDataSource = (
                         );
                     }
 
-                    let updatedColumns = columnsRef.current;
+                    let updatedColumns = updatedColumnsPerRowRef.current[rowIndex] ?? columnsRef.current;
 
-                    if (isMembersFormPage) {
+                    if (isMembersFormPage && (rowChangedRef.current == null || rowChangedRef.current == rowIndex)) {
                         // --- Rules cache check ---
                         const cacheKey = makeRowCacheKey(copyData, teiId ?? id);
                         let effects: any;
@@ -609,7 +621,6 @@ export const useDataSource = (
                         } else {
                             const prevEvents = prevEventsByTei[teiId] ?? [];
 
-                            console.log(prevEvents, 'prev')
                             effects = await CustomRunRulesForNewEvent({
                                 currentEvent: makeNumbers(columnsRef.current, copyData),
                                 orgUnit: orgUnitDataRef.current,
@@ -640,6 +651,11 @@ export const useDataSource = (
                                 ...(rowValueRef.current[rowIndex] || {}),
                                 ...makeNumbers(columnsRef.current, ruleValues),
                             },
+                        };
+
+                        updatedColumnsPerRowRef.current = {
+                            ...updatedColumnsPerRowRef.current,
+                            [rowIndex]: updatedColumns,
                         };
 
                         if (generalError) {
@@ -746,6 +762,8 @@ export const useDataSource = (
                                 acc[colId] = React.createElement(InlineEventCellField, {
                                     key: `${eventRecord.id}-${colId}`,
                                     column: thisHeader as any,
+                                    rowChangedRef,
+                                    rowIndex,
                                     value: thisHeader && 'value' in thisHeader ? thisHeader.value : clientValue,
                                     ...((isMembersFormLocked || eventRecord.loading)
                                         ? { disabled: isMembersFormLocked || eventRecord.loading }
