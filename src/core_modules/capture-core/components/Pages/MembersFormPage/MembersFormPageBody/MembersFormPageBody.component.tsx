@@ -22,6 +22,7 @@ import './membersFormPageBody.css';
 import { useRecoilValue } from 'recoil';
 import { displayTextRule } from '../schema/infoSchema';
 import { isMembersFormPage } from 'capture-core/components/WorkingLists/utils/isMembersFormPage';
+import { useGetOrgUnit } from '../hooks/optionGroup/useGetOUdata';
 
 const styles: Readonly<any> = {
     listContainer: {
@@ -75,6 +76,7 @@ const MembersFormPageBodyPlain = ({
 }: Props) => {
     const { bulkDataEntryConfigurations } = useBulkDataEntryConfigurations(programId);
     const displayText = useRecoilValue(displayTextRule);
+    const { loadingOptionGroups, errorOptionGroups } = useGetOrgUnit();
 
     const showMainPage = useMemo(() => {
         const noProgramSelected = !programId;
@@ -114,7 +116,7 @@ const MembersFormPageBodyPlain = ({
                     {mainPageStatus === MainPageStatuses.SHOW_WORKING_LIST && (
                         <div className={classes.container} data-test={'main-page-working-list'}>
                             <div className={cx(classes.leftColumn, 'left-column-main-page')}>
-                                <div style={{maxHeight:"250px",overflow:"scroll"}} > 
+                                <div style={{ maxHeight: "250px", overflow: "scroll" }} >
                                     {
                                         (displayText?.length > 0 && isMembersFormPage()) && displayText.map((x, index) =>
                                             <div style={{ marginBottom: "5px" }} key={index}>

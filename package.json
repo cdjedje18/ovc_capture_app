@@ -1,7 +1,7 @@
 {
     "name": "ovc-capture-app",
     "homepage": ".",
-    "version": "1.0.0",
+    "version": "1.0.8",
     "cacheVersion": "2",
     "license": "BSD-3-Clause",
     "private": true,
@@ -63,7 +63,7 @@
         "reselect": "^4.1.7",
         "rxjs": "^7.5.5",
         "typeface-roboto": "^0.0.75",
-        "uuid": "^9.0.0",
+        "uuid": "^13.0.0",
         "zod": "^3.24.4"
     },
     "scripts": {

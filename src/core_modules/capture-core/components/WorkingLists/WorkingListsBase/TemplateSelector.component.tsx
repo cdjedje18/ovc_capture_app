@@ -9,6 +9,8 @@ import { useMainViewConfig } from
 import type { WorkingListTemplates } from './workingListsBase.types';
 import { TableHeaderTabsSelector } from './TableHeaderTabsSelector.component';
 import { setSelectedMembersVisitDate, useSelectedMembersVisitDate } from './membersVisitDate.store';
+import useShowAlerts from 'capture-core/components/Pages/MembersFormPage/hooks/common/useShowAlert';
+import moment from 'moment';
 
 const getBorder = (theme: any) => {
     const color = theme.palette.dividerLighter;
@@ -122,10 +124,31 @@ const TemplateSelectorPlain = ({
 
         return labelFromStage ? `${labelFromStage}:` : 'Data da visita:';
     }, [dataEntryPrograms, isMembersFormPage, programId]);
+    const { hide, show } = useShowAlerts()
+
+    const isDateInFuture = (dateString: string) => {
+        const normalized = moment(dateString, ['DD-MM-YYYY', 'YYYY-MM-DD'], true).format('YYYY-MM-DD');
+        const selectedDate = new Date(normalized);
+        const today = new Date();
+
+        today.setHours(0, 0, 0, 0);
+        selectedDate.setHours(0, 0, 0, 0)
+
+        return selectedDate > today;
+    };
 
     const onDateSelect = React.useCallback(
         (value: { calendarDateString: string } | null) => {
-            setSelectedMembersVisitDate(value?.calendarDateString ?? undefined);
+            if (value?.calendarDateString)
+                if (!isDateInFuture(value?.calendarDateString!)) {
+                    setSelectedMembersVisitDate(value?.calendarDateString ?? undefined);
+                } else {
+                    show({
+                        message: `A data não pode ser maior que hoje`,
+                        type: { critical: true }
+                    });
+                    setTimeout(hide, 5000);
+                }
         },
         [],
     );

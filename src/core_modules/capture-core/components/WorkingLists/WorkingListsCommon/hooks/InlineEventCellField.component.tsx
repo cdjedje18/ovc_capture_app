@@ -20,6 +20,8 @@ type Props = {
         error?: boolean
         content?: string
     };
+    rowChangedRef: any
+    rowIndex: number
     value: any;
     onCommit: (value: any, handledByRule?: boolean) => void;
     disabled?: boolean;
@@ -104,6 +106,8 @@ export const InlineEventCellField = React.memo(({
     onCommit,
     disabled,
     saveStatus = 'idle',
+    rowChangedRef,
+    rowIndex
 }: Props) => {
     const [localValue, setLocalValue] = useState<any>(value ?? null);
 
@@ -112,9 +116,8 @@ export const InlineEventCellField = React.memo(({
     }, [value, column.id]);
 
     useEffect(() => {
-        if (column.value !== null && column?.rowChanged && column?.rowChanged?.length > 0) {
-            commit(column?.value);
-            // onCommit(column?.value, true);
+        if (column && 'value' in column) {
+            onCommit(column?.value);
         }
     }, [column.value]);
 
@@ -131,6 +134,7 @@ export const InlineEventCellField = React.memo(({
         if (disabled) {
             return;
         }
+        rowChangedRef.current = rowIndex
         setLocalValue(nextValue);
         onCommit(nextValue);
     }, [onCommit, disabled]);
@@ -165,7 +169,7 @@ export const InlineEventCellField = React.memo(({
                     fontSize: 12,
                     fontWeight: 500,
                     marginTop: 6,
-                    color: (saveStatus === 'error' || showMessage || column?.error) ? '#ff0000' : saveStatus === 'success' ? '#18c23d' : '#dcc414',
+                    color: ((saveStatus === 'error' || showMessage || column?.error)) ? '#ff0000' : saveStatus === 'success' ? '#18c23d' : '#dcc414',
                 }}
             >
                 {column?.error ? column?.content : saveStatus === 'saving' ? 'Enviando dados...' : saveStatus === 'success' ? 'Enviado' : showMessage ? 'Campo obrigatório*' : 'Campo inválido'}
@@ -252,7 +256,7 @@ export const InlineEventCellField = React.memo(({
         return (
             <div style={commonStyle}>
                 <TextField
-                    value={localValue ?? ''}
+                    value={(localValue != null && localValue != undefined) ? localValue?.toString() : ''}
                     onChange={handleNumericChange}
                     onBlur={handleNumericBlur}
                     disabled={disabled || column?.disabled}
@@ -266,7 +270,7 @@ export const InlineEventCellField = React.memo(({
     return (
         <div style={commonStyle}>
             <TextField
-                value={localValue ?? ''}
+                value={localValue?.toString() ?? ''}
                 onChange={setLocalValue}
                 onBlur={commit}
                 disabled={disabled || column?.disabled}

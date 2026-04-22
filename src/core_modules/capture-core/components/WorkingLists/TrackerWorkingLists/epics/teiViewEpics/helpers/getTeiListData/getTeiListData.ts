@@ -17,7 +17,7 @@ import type { InputMeta } from './getTeiListData.types';
 import type { TeiColumnsMetaForDataFetching, TeiFiltersOnlyMetaForDataFetching } from '../../../../types';
 import { isMembersFormPage as isMembersFormPageRoute } from '../../../../../utils/isMembersFormPage';
 import { getLocationQuery } from '../../../../../../../utils/routing';
-import { setAvailableMembersVisitDates } from '../../../../../WorkingListsBase/membersVisitDate.store';
+import { setAvailableMembersVisitDates, setTeiEvents } from '../../../../../WorkingListsBase/membersVisitDate.store';
 import { determineLinkedEntity } from
     '../../../../../../WidgetsRelationship/common/RelationshipsWidget/useGroupedLinkedEntities';
 
@@ -114,13 +114,76 @@ const getAvailableEventDatesFromTeis = (
     apiTrackedEntities: Array<any>,
     programId?: string,
     programStageId?: string,
-) => apiTrackedEntities
-    .flatMap(tei => (tei.enrollments || [])
-        .filter(enrollment => !programId || enrollment.program === programId)
-        .flatMap(enrollment => (enrollment.events || [])
-            .filter(event => (!programId || event.program === programId) && (!programStageId || event.programStage === programStageId))
-            .map(event => event.occurredAt?.slice(0, 10))
-            .filter(Boolean)));
+) => {
+    const teiEvents: Array<{ tei: string, events: any[] }> = []
+
+    const dates = apiTrackedEntities
+        .flatMap(tei => {
+            const teiId = tei.trackedEntity || tei.trackedEntityId || tei.id
+
+            const filteredEvents = (tei.enrollments || [])
+                .filter(enrollment => !programId || enrollment.program === programId)
+                .flatMap(enrollment =>
+                    (enrollment.events || [])
+                        .filter(event =>
+                            (!programId || event.program === programId) &&
+                            (!programStageId || event.programStage === programStageId)
+                        )
+                        .map(event => {
+                            const dataValuesObj = (event.dataValues || []).reduce(
+                                (acc: any, dv: any) => {
+                                    if (dv.value !== null && dv.value !== undefined) {
+                                        acc[dv.dataElement] = dv.value
+                                    }
+                                    return acc
+                                },
+                                {}
+                            )
+
+                            return {
+                                eventId: event.event,
+                                status: event.status,
+                                programId: event.program,
+                                programStageId: event.programStage,
+                                enrollmentId: enrollment.enrollment,
+                                trackedEntityId: teiId,
+                                orgUnitId: event.orgUnit || enrollment.orgUnit,
+                                orgUnitName: event.orgUnitName || tei.orgUnitName,
+                                relationships: event.relationships || [],
+                                occurredAt: event.occurredAt,
+                                scheduledAt: event.scheduledAt,
+                                followup: event.followup ?? false,
+                                deleted: event.deleted ?? false,
+                                createdAt: event.createdAt,
+                                updatedAt: event.updatedAt,
+                                attributeOptionCombo: event.attributeOptionCombo,
+                                attributeCategoryOptions: event.attributeCategoryOptions,
+                                assignedUser: event.assignedUser || {},
+                                createdBy: event.createdBy,
+                                updatedBy: event.updatedBy,
+                                notes: event.notes || [],
+                                ...dataValuesObj
+                            }
+                        })
+                )
+
+            if (filteredEvents.length > 0) {
+                teiEvents.push({
+                    tei: teiId,
+                    events: filteredEvents
+                })
+            }
+
+            return filteredEvents
+                .map(event => event.occurredAt?.slice(0, 10))
+                .filter(Boolean)
+        })
+
+    return {
+        dates,
+        teiEvents
+    }
+}
 
 export const createApiQueryArgs = ({
     page,
@@ -131,9 +194,9 @@ export const createApiQueryArgs = ({
     sortById,
     sortByDirection,
 }: RawQueryArgs,
-columnsMetaForDataFetching: TeiColumnsMetaForDataFetching,
-filtersOnlyMetaForDataFetching: TeiFiltersOnlyMetaForDataFetching,
-trackedEntityIds?: Array<string>,
+    columnsMetaForDataFetching: TeiColumnsMetaForDataFetching,
+    filtersOnlyMetaForDataFetching: TeiFiltersOnlyMetaForDataFetching,
+    trackedEntityIds?: Array<string>,
 ): { [key: string]: any } => {
     const orgUnitModeQueryParam: string = featureAvailable(FEATURES.newOrgUnitModeQueryParam)
         ? 'orgUnitMode'
@@ -156,7 +219,7 @@ trackedEntityIds?: Array<string>,
             ? { [getTrackedEntitiesQueryParam()]: getJoinedTeiIds(trackedEntityIds) }
             : {}),
         fields: isMembersFormPageRoute()
-            ? ':all,!relationships,programOwners[orgUnit,program],enrollments[enrollment,orgUnit,program,status,events[event,occurredAt,program,programStage]]'
+            ? ':all,!relationships,programOwners[orgUnit,program],enrollments[enrollment,orgUnit,program,status,events[*]]'
             : ':all,!relationships,programOwners[orgUnit,program]',
     };
 };
@@ -310,12 +373,15 @@ export const getTeiListData = async (
 
     const apiResponse = await querySingleResource({ resource: url, params: queryParams });
     const apiTrackedEntities = handleAPIResponse(REQUESTED_ENTITIES.trackedEntities, apiResponse);
+
     if (isMembersFormPageRoute()) {
-        setAvailableMembersVisitDates(getAvailableEventDatesFromTeis(
+        const { dates, teiEvents } = getAvailableEventDatesFromTeis(
             apiTrackedEntities,
             rawQueryArgs.programId,
             rawQueryArgs.programStageId,
-        ));
+        )
+        setTeiEvents(teiEvents)
+        setAvailableMembersVisitDates(dates);
     }
     const columnsMetaForDataFetchingArray = [...columnsMetaForDataFetching.values()];
     const clientTeis = convertToClientTeis(apiTrackedEntities, columnsMetaForDataFetchingArray, rawQueryArgs.programId);
