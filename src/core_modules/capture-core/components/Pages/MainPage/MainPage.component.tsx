@@ -9,6 +9,7 @@ import { Fab } from '@mui/material';
 import { CircularLoader, IconSettings24 } from '@dhis2/ui';
 import ConfigurationModal from './MainPageBody/formDialog/formDialog';
 import { useDataStore } from './MainPageBody/formDialog/dataStore/useDataStore';
+import { useUserLocale } from 'capture-core/utils/localeData/useUserLocale';
 
 const styles = {
     containerBulkDataEntry: {
@@ -41,6 +42,7 @@ const MainPageComponentPlain = ({
 }: MainPageComponentProps & WithStyles<typeof styles>) => {
     const [open, setOpen] = useState(false);
     const { data, error: err, loading } = useDataStore()
+    const { isSuperuser } = useUserLocale()
 
     if (data?.config?.entries?.length > 0) {
         const nomeDoMembro = data?.config?.entries?.find((x: any) => x.key == 'data_entry')?.value?.programs?.[0]?.nomeDoMembro || ''
@@ -80,20 +82,24 @@ const MainPageComponentPlain = ({
                             onOpenBulkDataEntryPlugin={onOpenBulkDataEntryPlugin}
                             bulkDataEntryTrackedEntityIds={bulkDataEntryTrackedEntityIds}
                         />
-                        <Fab
-                            color="primary"
-                            aria-label="add"
-                            style={{
-                                position: 'fixed',
-                                bottom: 16,
-                                right: 16,
-                            }}
-                            onClick={() => setOpen(true)}
-                        >
-                            <IconSettings24 />
-                        </Fab>
+                        {
+                            !!(isSuperuser) && <>
+                                <Fab
+                                    color="primary"
+                                    aria-label="add"
+                                    style={{
+                                        position: 'fixed',
+                                        bottom: 16,
+                                        right: 16,
+                                    }}
+                                    onClick={() => setOpen(true)}
+                                >
+                                    <IconSettings24 />
+                                </Fab>
 
-                        <ConfigurationModal data={data?.config?.entries} open={open} setOpen={setOpen} />
+                                <ConfigurationModal data={data?.config?.entries} open={open} setOpen={setOpen} />
+                            </>
+                        }
                     </>
             }
         </div>

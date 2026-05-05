@@ -1,7 +1,6 @@
 import { useDataQuery } from "@dhis2/app-runtime"
 import { useCreateDsDir } from "./useCreateDsDir";
 import useShowAlerts from 'capture-core/components/Pages/MembersFormPage/hooks/common/useShowAlert';
-import { useGetFavorites } from "./useGetFavorites";
 
 const DATASTORE_QUERY = ({
     config: {
@@ -15,7 +14,6 @@ const DATASTORE_QUERY = ({
 export function useDataStore() {
     const { hide, show } = useShowAlerts()
     const { createDir, loading: loadingCreation } = useCreateDsDir()
-    const { getTemplates } = useGetFavorites()
 
     const { data, loading, error } = useDataQuery<{ config: any }>(DATASTORE_QUERY, {
         onError(error) {
