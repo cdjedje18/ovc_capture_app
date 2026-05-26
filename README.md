@@ -51,10 +51,11 @@ yarn start
 ```
 
 After the execution you will see to introduce the credentials, fill the fields with the following data:
-> server: http://localhost:8080
-> username: <your-username>
-> password: <your-password>
-
+```
+ server: http://localhost:8080
+ username: <your-username>
+ password: <your-password>
+```
 #### 4. Build the application
 
 To build the application locally run:
